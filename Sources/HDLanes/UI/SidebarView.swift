@@ -236,10 +236,12 @@ private struct SessionContextMenu: View {
 
     var body: some View {
         Button(L.renameEllipsis) { actions.rename(session.id) }
-        if model.isSessionRunning(session.id) {
+        let running = model.isSessionRunning(session.id)
+        if !running || model.agentEndedInLiveShell(session.id) {
+            Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeFromUI(session.id) }
+        }
+        if running {
             Button(L.stop) { model.stop(session.id) }
-        } else {
-            Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeSession(session.id) }
         }
         Divider()
         Button(L.closeEllipsis) { actions.close(session.id, false) }

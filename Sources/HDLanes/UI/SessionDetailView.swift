@@ -22,11 +22,10 @@ struct SessionDetailView: View {
                     }
                 }
             }
+            // Only on appear: `unread` turns true for the selected session only while hdlanes is in
+            // the background, and clearing it then would withdraw the notification just posted.
+            // Coming back to the app marks it seen (didBecomeActive observer).
             .onAppear { model.markSeen(sessionID) }
-            .onChange(of: model.runtimes[sessionID]?.unread ?? false) { _, unread in
-                // The user is looking at it, so it isn't unread.
-                if unread { model.markSeen(sessionID) }
-            }
         } else {
             ContentUnavailableView(L.sessionMissing, systemImage: "questionmark.square.dashed")
         }
@@ -68,19 +67,44 @@ private struct SessionHeader: View {
     }
 }
 
-/// Resume when nothing runs in the terminal, Stop while it does.
+/// Resume when nothing runs in the terminal, Stop while it does. When the agent exited but left its
+/// shell open, both: Resume starts the agent there again, Stop ends the shell.
 private struct RunControl: View {
     let session: AgentSession
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if model.isSessionRunning(session.id) {
-            Button(L.stop) { model.stop(session.id) }
-                .controlSize(.small)
-                .help(L.stopHelp)
-        } else {
-            Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeSession(session.id) }
-                .controlSize(.small)
+        let running = model.isSessionRunning(session.id)
+        HStack(spacing: 6) {
+            if !running || model.agentEndedInLiveShell(session.id) {
+                Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeFromUI(session.id) }
+                    .controlSize(.small)
+            }
+            if running {
+                Button(L.stop) { model.stop(session.id) }
+                    .controlSize(.small)
+                    .help(L.stopHelp)
+            }
+        }
+    }
+}
+
+extension AppModel {
+    /// The agent of this session exited but its shell still runs in the terminal (the launch script
+    /// ends in `exec $SHELL`). Based on observable state only, so views update when it changes.
+    func agentEndedInLiveShell(_ id: UUID) -> Bool {
+        guard session(id)?.provider.isAgent == true, isSessionRunning(id) else { return false }
+        if case .exited = liveStatus(id) { return true }
+        return false
+    }
+
+    /// Resume from a button or menu. In a live shell the agent only restarts when the shell itself is
+    /// in front; if a job the user started holds the terminal, nothing happens, so say why.
+    func resumeFromUI(_ id: UUID) {
+        let inShell = agentEndedInLiveShell(id)
+        resumeSession(id)
+        if inShell, alert == nil, agentEndedInLiveShell(id) {
+            alert = AppAlert(title: L.resumeShellBusyTitle, message: L.resumeShellBusyBody)
         }
     }
 }
@@ -130,7 +154,9 @@ private struct SessionTerminalArea: View {
     var body: some View {
         VStack(spacing: 0) {
             if !model.isSessionRunning(session.id) {
-                NotRunningStrip(session: session)
+                NotRunningStrip(session: session, agentExitedInShell: false)
+            } else if model.agentEndedInLiveShell(session.id) {
+                NotRunningStrip(session: session, agentExitedInShell: true)
             }
             TerminalHost(sessionID: session.id)
                 .padding(.leading, 6)
@@ -140,19 +166,21 @@ private struct SessionTerminalArea: View {
     }
 }
 
-/// Shown above the terminal when no process runs in it (e.g. a session from a previous app run).
+/// Shown above the terminal when no process runs in it (e.g. a session from a previous app run), or
+/// when the agent exited and only its shell is left.
 private struct NotRunningStrip: View {
     let session: AgentSession
+    let agentExitedInShell: Bool
     @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "pause.circle")
                 .foregroundStyle(.secondary)
-            Text(L.notRunning)
+            Text(agentExitedInShell ? L.agentExitedShellOpen : L.notRunning)
                 .font(.system(size: 12))
             Spacer()
-            Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeSession(session.id) }
+            Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeFromUI(session.id) }
                 .controlSize(.small)
                 .help(session.provider.isAgent && session.agentSessionID != nil ? L.resumeHelp : L.startFreshHelp)
         }

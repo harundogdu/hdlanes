@@ -13,7 +13,8 @@ struct MainWindow: View {
         } detail: {
             VStack(spacing: 0) {
                 if let warning = model.loadWarning {
-                    LoadWarningBanner(text: warning) { model.loadWarning = nil }
+                    // While saving is blocked the banner can't be dismissed: nothing done now is kept.
+                    LoadWarningBanner(text: warning, dismiss: model.persistenceBlocked ? nil : { model.loadWarning = nil })
                     Divider()
                 }
                 DetailContent()
@@ -76,7 +77,7 @@ private struct MainToolbar: ToolbarContent {
 
 private struct LoadWarningBanner: View {
     let text: String
-    let dismiss: () -> Void
+    let dismiss: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -86,9 +87,11 @@ private struct LoadWarningBanner: View {
                 .font(.system(size: 12))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: dismiss) { Image(systemName: "xmark") }
-                .buttonStyle(.borderless)
-                .help(L.dismiss)
+            if let dismiss {
+                Button(action: dismiss) { Image(systemName: "xmark") }
+                    .buttonStyle(.borderless)
+                    .help(L.dismiss)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
