@@ -2,7 +2,7 @@
 
 hdlanes is a native macOS app (SwiftUI + AppKit, SwiftPM, macOS 14+) for running many coding agents —
 Claude Code and OpenAI Codex CLI — side by side, each in its own terminal, git worktree and **account**.
-Everything runs locally. The research behind the decisions is in `docs/research/` (Turkish).
+Everything runs locally.
 
 ## Principles
 
