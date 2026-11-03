@@ -6,6 +6,7 @@ import SwiftUI
 enum SidebarSelection: Hashable {
     case session(UUID)
     case board
+    case tracking
 }
 
 enum InspectorTab: String, CaseIterable, Identifiable {
@@ -80,6 +81,9 @@ final class AppModel {
 
     // Workspace area (UI/)
     var accountHealth: [UUID: AccountHealth] = [:]
+
+    // Tracking area (Tracking/): observable on its own.
+    @ObservationIgnored let tracking = TrackingStore()
 
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 

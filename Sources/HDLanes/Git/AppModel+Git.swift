@@ -293,6 +293,7 @@ extension AppModel {
         let url = try await GitService.createPullRequest(in: info.directory, title: title, body: body,
                                                          base: info.base, head: head)
         diffs[sessionID]?.pullRequestURL = url
+        pullRequestOpened(sessionID: sessionID, title: title, url: url)
         return url
     }
 

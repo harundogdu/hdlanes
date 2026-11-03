@@ -70,6 +70,8 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     public var defaultClaudeAccount: UUID?
     public var defaultCodexAccount: UUID?
     public var isCollapsed: Bool?
+    /// First prompt of a review session started from Tracking; nil → `ReviewPrompt.defaultTemplate`.
+    public var reviewPromptTemplate: String?
 
     public init(id: UUID = UUID(), name: String, path: String) {
         self.id = id
@@ -102,6 +104,11 @@ public struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     public var createdAt: Date
     public var lastActivityAt: Date?
     public var isArchived: Bool?
+    /// The agent's last finished-turn message (≤500 characters) and when it arrived.
+    public var lastResult: String?
+    public var lastResultAt: Date?
+    /// Web URL of the pull request a review session was started for (its worktree is detached).
+    public var reviewPullRequestURL: String?
 
     public init(id: UUID = UUID(), projectID: UUID, title: String, provider: Provider, accountID: UUID?,
                 cwd: String, createdAt: Date = Date()) {

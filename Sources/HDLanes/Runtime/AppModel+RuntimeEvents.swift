@@ -291,6 +291,7 @@ extension AppModel {
 
     private func statusChanged(_ id: UUID, from old: AgentStatus, to new: AgentStatus) {
         guard old != new else { return }
+        trackingStatusChanged(id, from: old, to: new)
         func isError(_ status: AgentStatus) -> Bool { if case .error = status { return true } else { return false } }
         let becameDone = new == .done
         // A turn that ended in an API error (usage limit, overload, billing) ended too; a changed

@@ -241,6 +241,53 @@ Sessions whose cwd no longer exists are counted, not listed. Known limit: `repos
 worktree is the worktree itself, so a session in a worktree outside any project's folder becomes its own
 project.
 
+## Tracking (tracking area)
+
+`HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` (pure, tested),
+`Tracking/*` (app side). The sidebar's **Takip / Tracking** row (`SidebarSelection.tracking`) opens it.
+
+**Activity log.** `~/.hdlanes/activity.jsonl`, append-only, one `ActivityEvent` per line
+(`{at, kind, sessionID?, projectID?, title, detail?, prURL?}`, ISO 8601 dates). Kinds: `sessionStarted`
+(first launch only), `turnDone` (detail = the agent's last assistant message), `needsYou`, `error`,
+`sessionClosed` (archive), `prOpened` (`createPullRequest`), `prMerged` (one of my PRs left the open list
+and `gh pr view` / `az repos pr show` says merged/completed), `reviewStarted`, `taskMoved`. `detail` is
+flattened and capped at 500 characters; no secrets go in. An event identical to the session's previous
+one within 30 minutes is dropped (`ActivityDebouncer`). Readers take only the last 2 MB of a file; past
+5 MB the file is moved to `activity-YYYY-MM.jsonl` (month of the rotation; appended to if it exists).
+Writes come from one-line calls in other areas: `statusChanged` → `trackingStatusChanged`, `launch` →
+`recordActivity(.sessionStarted)`, `archiveSession`, `setTaskStatus`, `createPullRequest`. A turn that
+ends also stores `AgentSession.lastResult` / `lastResultAt`.
+
+**Pull requests.** For each project, `git remote get-url origin` is parsed by `RemoteRepo.parse`
+(GitHub https/ssh, Azure DevOps `dev.azure.com`, `{org}.visualstudio.com`, `ssh.dev.azure.com:v3`);
+projects sharing a repository are read once. GitHub: `gh pr list --repo o/r --state open --json
+<GitHubPRParser.jsonFields>` with `--author @me` and with `--search review-requested:@me`. Azure:
+`az repos pr list --org https://dev.azure.com/{org} --project … --repository … --status active --detect
+false -o json` with `--creator <me>` and `--reviewer <me>` (me = `az account show --query user.name`,
+cached), and for at most 15 of my PRs (4 at a time) `az repos pr policy list --org … --id N`
+(no `--project` flag there). Azure CI comes only from `Build`/`Status` policy evaluations: other policies
+(merge strategy, reviewer minimums) report `rejected` on healthy PRs. Votes: 10/5 approved, 0 none,
+-5 waiting for author, -10 rejected. `az` is found like `gh` (Homebrew paths, then a login shell); calls
+time out after 30 s; a missing CLI, a missing login (`gh auth login`, `az login`, `AADSTS…`) and network
+errors are shown inline per tool. Refresh: once at launch (sidebar row), on opening Tracking, every
+3 minutes while it is visible, after `createPullRequest`, and by hand. A PR links to a session when the
+session's project has the same repository and `session.branch == pr.sourceBranch`.
+
+**Read-only rule.** Tracking never comments, votes, approves, completes, pushes or edits a PR. The only
+writes are local: the review worktree and session, the activity log and saved reports
+(`~/.hdlanes/reports/YYYY-MM-DD.md`).
+
+**Review sessions.** `git fetch origin <source> <target>`, then `git worktree add --detach
+<worktree parent>/review-<n>-<slug> origin/<source>` (no branch is created), `copyFiles` copied, and an
+`AgentSession` with `worktreePath`, `branch = source`, `baseRef = origin/<target>`, category `review`,
+`reviewPullRequestURL`, and `initialPrompt = ReviewPrompt.render(project.reviewPromptTemplate, pr:)`
+(placeholders `{url} {number} {title} {source} {target} {repo}`). The default account is a Claude account
+other than the one that ran the PR's own session.
+
+**End of day.** `DaySummary.markdown` over the day's events plus what is open now; the optional
+"Summarize with AI" runs one `claude -p --output-format json --model haiku` on a chosen Claude account,
+only on click.
+
 ## Areas and ownership (v0.1 build-out)
 
 | Area | Files | Contract |
@@ -249,6 +296,7 @@ project.
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
+| tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
 
 Cross-area calls go only through the signatures in those three `AppModel+*.swift` files. Do not edit
 another area's files; if you need something from another area, call its contract method.

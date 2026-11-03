@@ -48,6 +48,8 @@ private struct DetailContent: View {
             }
         case .board:
             TaskBoardView()
+        case .tracking:
+            TrackingView()
         case nil:
             WelcomeView()
         }

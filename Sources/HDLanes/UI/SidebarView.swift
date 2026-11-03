@@ -27,6 +27,8 @@ struct SidebarView: View {
         @Bindable var model = model
         let sections = model.sidebarSections()
         List(selection: $model.selection) {
+            TrackingSidebarRow()
+                .tag(SidebarSelection.tracking)
             BoardRow()
                 .tag(SidebarSelection.board)
             ForEach(sections) { section in

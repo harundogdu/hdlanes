@@ -212,6 +212,8 @@ struct ProjectSettingsSheet: View {
                 accountPicker(.claude, \.defaultClaudeAccount)
                 accountPicker(.codex, \.defaultCodexAccount)
             }
+            ReviewTemplateSection(template: Binding(get: { draft?.reviewPromptTemplate },
+                                                    set: { draft?.reviewPromptTemplate = $0 }))
         }
         .formStyle(.grouped)
     }

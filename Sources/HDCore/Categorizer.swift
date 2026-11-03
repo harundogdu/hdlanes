@@ -12,11 +12,12 @@ import Foundation
 /// (`tieBreakOrder`). Nothing matched → `defaultID`.
 public enum Categorizer {
     /// Display order for pickers.
-    public static let ids: [String] = ["bug", "feature", "refactor", "test", "docs", "ui", "chore", "research"]
+    /// "review" is only set by review sessions started from Tracking; it has no keyword rules.
+    public static let ids: [String] = ["bug", "feature", "refactor", "test", "docs", "ui", "chore", "research", "review"]
     public static let defaultID = "feature"
 
     /// Specific categories beat generic ones: "add tests" is a test task, "fix the UI" a bug.
-    static let tieBreakOrder: [String] = ["bug", "test", "docs", "refactor", "ui", "research", "chore", "feature"]
+    static let tieBreakOrder: [String] = ["bug", "test", "docs", "refactor", "ui", "research", "chore", "feature", "review"]
 
     public static func isValid(_ id: String) -> Bool { ids.contains(id) }
 
@@ -54,6 +55,7 @@ public enum Categorizer {
                   .w("version"), .w("ci"), .s("sürüm"), .s("surum"), .s("güncelle"), .s("guncelle")],
         "research": [.w("research"), .w("investigate"), .w("explore"), .w("why"),
                      .s("araştır"), .s("arastir"), .s("incele"), .s("neden")],
+        "review": [],
     ]
 
     static let branchPrefixes: [(prefix: String, category: String)] = [
