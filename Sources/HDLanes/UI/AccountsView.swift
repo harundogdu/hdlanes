@@ -83,10 +83,15 @@ private struct AccountRow: View {
             ColorMenu(account: account)
                 .padding(.top, 3)
             VStack(alignment: .leading, spacing: 3) {
-                TextField(L.accountLabel, text: $labelDraft)
+                // Inside a grouped Form a labelled TextField renders as "label …… value"; the account name
+                // is the row's title, so hide the label and keep it left-aligned and editable in place.
+                TextField(L.accountLabel, text: $labelDraft, prompt: Text(L.accountLabel))
+                    .labelsHidden()
                     .textFieldStyle(.plain)
+                    .multilineTextAlignment(.leading)
                     .font(.system(size: 13, weight: .medium))
                     .onSubmit(commitLabel)
+                    .help(L.accountLabel)
                 Text(L.accountDetailLine(account))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -201,6 +206,7 @@ private struct HealthLine: View {
                 Button(health?.loggedIn == true ? L.logInAgain : L.logIn, action: login)
                     .controlSize(.small)
                     .buttonStyle(.link)
+                    .fixedSize()
             }
         }
         .font(.system(size: 11))
