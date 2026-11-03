@@ -116,6 +116,13 @@ extension AppModel {
 
         var issues: [String: PRIssue] = [:]
         var prs: [PullRequest] = []
+        // Review requests from every Azure DevOps project the added repos belong to.
+        var azureProjects: [String: (org: String, project: String)] = [:]
+        for t in targets { if case .azure(let org, let project, _) = t.repo { azureProjects["\(org)/\(project)"] = (org, project) } }
+        let reviewLists = await PRService.mapLimited(Array(azureProjects.values), limit: PRService.concurrency) {
+            await PRService.fetchAzureReviews(org: $0.org, project: $0.project)
+        }
+        prs += reviewLists.flatMap { $0 }.filter { $0.reviewRequestedFromMe }
         var readRepos: Set<String> = []
         for r in results {
             prs += r.prs

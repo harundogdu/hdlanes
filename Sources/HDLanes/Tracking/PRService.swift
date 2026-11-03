@@ -156,6 +156,28 @@ enum PRService {
         return result
     }
 
+    /// Review requests across a whole Azure DevOps project, not only the repos added as hdlanes
+    /// projects: being asked to review in another repo is exactly what's easy to lose track of.
+    /// One list call per (org, project); PRs are grouped by their repository for parsing.
+    static func fetchAzureReviews(org: String, project: String) async -> [PullRequest] {
+        guard case .success(let me) = await AzureCLI.shared.currentUser() else { return [] }
+        let args = ["repos", "pr", "list", "--org", "https://dev.azure.com/\(org)", "--project", project,
+                    "--reviewer", me, "--status", "active", "--top", "100", "--detect", "false", "-o", "json"]
+        guard case .success(let text) = await runAZ(args),
+              let items = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [[String: Any]] else { return [] }
+        var byRepo: [String: [[String: Any]]] = [:]
+        for item in items {
+            guard let name = (item["repository"] as? [String: Any])?["name"] as? String else { continue }
+            byRepo[name, default: []].append(item)
+        }
+        var prs: [PullRequest] = []
+        for (name, group) in byRepo {
+            guard let data = try? JSONSerialization.data(withJSONObject: group) else { continue }
+            prs += (try? AzurePRParser.parse(data, org: org, project: project, repo: name, me: me, reviewList: true)) ?? []
+        }
+        return prs
+    }
+
     private static func fetchAzure(_ repo: RemoteRepo, org: String, project: String, name: String) async -> RepoFetch {
         var result = RepoFetch(repo: repo)
         let me: String
