@@ -23,6 +23,7 @@ extension L {
         case "ui": return pick("UI", "Arayüz")
         case "chore": return pick("Chore", "Bakım")
         case "research": return pick("Research", "Araştırma")
+        case "review": return pick("Review", "İnceleme")
         default: return id
         }
     }

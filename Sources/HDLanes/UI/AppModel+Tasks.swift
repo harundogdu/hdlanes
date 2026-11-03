@@ -27,6 +27,7 @@ extension AppModel {
     func setTaskStatus(_ id: UUID, _ status: TaskStatus) {
         guard task(id)?.status != status else { return }
         updateTask(id) { $0.status = status }
+        recordTaskMoved(id, to: status)
     }
 
     /// Removes the task; its sessions stay and just lose the link.

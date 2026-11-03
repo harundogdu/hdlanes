@@ -203,7 +203,7 @@ extension AppModel {
         // lastActivityAt stays nil: launch() treats nil as "first launch" and sends the prompt and setup.
 
         state.sessions.append(session)
-        if let task, task.status != .active { updateTask(task.id) { $0.status = .active } }
+        if let task, task.status != .active { setTaskStatus(task.id, .active) }
         selection = .session(session.id)
         launch(session.id, resume: false)
         return session.id
@@ -238,6 +238,7 @@ extension AppModel {
         // side (rollout watcher, waiting hook) here.
         runtimes[id]?.isProcessRunning = false
         endRuntime(id)
+        if session(id)?.isArchived != true { recordActivity(.sessionClosed, sessionID: id) }
         updateSession(id) { $0.isArchived = true }
         updateDockBadge()
         if selectedSessionID == id {

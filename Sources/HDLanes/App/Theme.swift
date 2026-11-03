@@ -41,6 +41,7 @@ enum Theme {
         "ui": Color(red: 0.85, green: 0.62, blue: 0.24),
         "chore": Color(red: 0.50, green: 0.55, blue: 0.60),
         "research": Color(red: 0.25, green: 0.55, blue: 0.85),
+        "review": Color(red: 0.18, green: 0.52, blue: 0.62),
     ]
 
     static func categoryColor(_ id: String?) -> Color {

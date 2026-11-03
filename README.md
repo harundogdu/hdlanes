@@ -47,6 +47,14 @@ log out of anything.
   like) next to its terminal.
 - **Usage meters.** Each account shows how much of its 5-hour and weekly limits it has used, taken from
   Claude's status line and Codex's rate-limit events. No extra requests are made.
+- **Tracking.** One view for "what's going on, what needs me, what got done". **Today** lists sessions
+  and pull requests waiting for you (oldest first, with the reason), what each working agent is doing,
+  turns that finished today with their last message, and your open pull requests with CI, review and
+  conflict state, above a quiet log of the day. **Pull Requests** shows the ones you opened and the ones
+  waiting for your review, read with `gh` (GitHub) and `az` (Azure DevOps); hdlanes only reads them. A
+  **Review…** button checks a PR's branch out in a fresh worktree and starts Claude or Codex on it with a
+  prompt you can set per project. **End of Day** builds a Markdown report you can copy or save. Activity
+  is kept in `~/.hdlanes/activity.jsonl`.
 - **Task board.** Backlog, Active, Review and Done columns with drag and drop. A session can be started
   from a task and stays linked to it. Categories (bug, feature, refactor, test, docs, UI, chore, research)
   are guessed from English and Turkish keywords. If you turn it on, a single `claude -p` call on an account

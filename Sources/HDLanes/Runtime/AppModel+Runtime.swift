@@ -217,6 +217,7 @@ extension AppModel {
         }
         // Also marks the session as launched, so a later fresh start won't repeat the prompt or setup.
         touchActivity(sessionID, now: Date())
+        if firstLaunch { recordActivity(.sessionStarted, sessionID: sessionID) }
         if session.provider == .codex {
             startRolloutWatcher(sessionID, account: account, cwd: session.cwd,
                                 resumeThreadID: resumeAgent ? agentSessionID : nil)
