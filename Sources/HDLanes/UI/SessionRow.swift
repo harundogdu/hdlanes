@@ -21,10 +21,13 @@ struct SessionRow: View {
             SessionRowSubtitle(session: session)
                 .padding(.leading, 20)
             if let snapshot = runtime?.snapshot {
-                SubagentLines(subagents: snapshot.runningSubagents)
+                RunningSubagentLines(snapshot: snapshot)
                     .padding(.leading, 20)
                 if let permission = snapshot.pendingPermission, permission.canAnswer {
+                    // Keyed by request: a new request replacing the card drops an open Deny popover
+                    // and any click in progress instead of applying them to the new one.
                     PermissionCard(sessionID: session.id, permission: permission)
+                        .id(permission.id)
                         .padding(.leading, 20)
                         .padding(.top, 2)
                 }
@@ -64,6 +67,22 @@ private struct SessionRowSubtitle: View {
     }
 }
 
+/// Running subagents without Claude's bare internal helpers. While a bare one is young it may still
+/// turn out to be real, so the lines are redrawn every second until it is decided.
+private struct RunningSubagentLines: View {
+    let snapshot: AgentRuntimeSnapshot
+
+    var body: some View {
+        if snapshot.runningSubagents.contains(where: \.isBare) {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                SubagentLines(subagents: snapshot.visibleRunningSubagents(at: context.date))
+            }
+        } else {
+            SubagentLines(subagents: snapshot.runningSubagents)
+        }
+    }
+}
+
 /// Up to three running subagents, then "+N more".
 private struct SubagentLines: View {
     let subagents: [SubagentInfo]
@@ -99,6 +118,8 @@ private struct PermissionCard: View {
     @Environment(AppModel.self) private var model
     @State private var showDeny = false
     @State private var denyMessage = ""
+    /// The request the Deny popover was opened for.
+    @State private var denyTarget: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -113,8 +134,13 @@ private struct PermissionCard: View {
                     .help(permission.detail)
             }
             HStack(spacing: 6) {
-                Button(L.allow) { model.respondToPermission(sessionID: sessionID, allow: true, message: nil) }
-                Button(L.denyEllipsis) { showDeny = true }
+                Button(L.allow) {
+                    model.respondToPermission(sessionID: sessionID, permissionID: permission.id, allow: true, message: nil)
+                }
+                Button(L.denyEllipsis) {
+                    denyTarget = permission.id
+                    showDeny = true
+                }
                     .popover(isPresented: $showDeny, arrowEdge: .bottom) { denyPopover }
             }
             .controlSize(.small)
@@ -145,8 +171,10 @@ private struct PermissionCard: View {
     }
 
     private func deny() {
-        model.respondToPermission(sessionID: sessionID, allow: false, message: denyMessage.nilIfBlank)
+        model.respondToPermission(sessionID: sessionID, permissionID: denyTarget ?? permission.id, allow: false,
+                                  message: denyMessage.nilIfBlank)
         denyMessage = ""
+        denyTarget = nil
         showDeny = false
     }
 }

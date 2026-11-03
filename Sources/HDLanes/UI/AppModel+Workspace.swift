@@ -229,9 +229,12 @@ extension AppModel {
         let order = sidebarSessionIDs
         stop(id)
         terminals.remove(id)
-        // A removed view no longer reports its exit, so clear the running flag here.
+        // A removed view no longer reports its exit, so clear the running flag and end the runtime
+        // side (rollout watcher, waiting hook) here.
         runtimes[id]?.isProcessRunning = false
+        endRuntime(id)
         updateSession(id) { $0.isArchived = true }
+        updateDockBadge()
         if selectedSessionID == id {
             selection = SessionOrdering.neighbor(of: id, in: order).map { .session($0) }
         }

@@ -404,7 +404,7 @@ struct LoginTerminalSheet: View {
     }
 
     private func start() {
-        model.terminals.start(terminalID, spec: model.loginSpec(account: account, method: method, cwd: NSHomeDirectory()))
+        model.terminals.start(terminalID, spec: model.loginSpec(account: account, method: method, cwd: model.accountCLIDirectory()))
     }
 
     private func cleanUp() {

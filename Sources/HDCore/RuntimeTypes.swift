@@ -125,13 +125,16 @@ public struct PendingPermission: Equatable, Sendable {
     public var receivedAt: Date
     /// true while the hook process is connected and waiting for our answer.
     public var canAnswer: Bool
+    /// The subagent that asked (`agent_id` of the PermissionRequest); nil for the main agent.
+    public var agentID: String?
 
-    public init(id: String, tool: String, detail: String, receivedAt: Date, canAnswer: Bool) {
+    public init(id: String, tool: String, detail: String, receivedAt: Date, canAnswer: Bool, agentID: String? = nil) {
         self.id = id
         self.tool = tool
         self.detail = detail
         self.receivedAt = receivedAt
         self.canAnswer = canAnswer
+        self.agentID = agentID
     }
 }
 

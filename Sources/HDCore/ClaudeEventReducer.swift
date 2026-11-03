@@ -55,7 +55,7 @@ public struct ClaudeEventReducer: Sendable {
         case "UserPromptSubmit":
             turnActive = true
             if let prompt = payload["prompt"]?.string, !prompt.isEmpty { s.lastPrompt = prompt }
-            clearBlocks(&s)
+            clearBlocks(&s, keepingOpenPermission: true)
             s.status = .working
         case "PreToolUse":
             preToolUse(payload, stamp: stamp, &s, now: now)
@@ -76,14 +76,16 @@ public struct ClaudeEventReducer: Sendable {
             if let message = payload["last_assistant_message"]?.string, !message.isEmpty {
                 s.lastAssistantMessage = message
             }
-            s.backgroundTasks = payload["background_tasks"]?.array?.count ?? 0
-            s.status = s.backgroundTasks > 0 ? .working : .done
+            s.backgroundTasks = Self.backgroundWorkCount(payload["background_tasks"])
+            // A background agent still waiting on a permission keeps the session from being done.
+            s.status = s.backgroundTasks > 0 || s.pendingPermission != nil ? .working : .done
         case "StopFailure":
             turnEnded(stamp: stamp, &s)
             let code = Self.errorCode(payload["error"])
             s.status = code == "authentication_failed" ? .needsYou(.auth, detail: code) : .error(code)
         case "SessionEnd":
             turnEnded(stamp: stamp, &s)
+            s.pendingPermission = nil
             s.backgroundTasks = 0
             endSubagents(&s, now: now)
             s.status = .exited(nil)
@@ -140,6 +142,12 @@ public struct ClaudeEventReducer: Sendable {
                 s.status = .done
             case .working where authoritative:
                 s.status = .done
+            case .working where state.lowercased() == "idle" && turnActive && s.pendingPermission == nil && block == nil:
+                // Esc ends a turn without a Stop hook; Claude then reports "idle" ("done" means the turn
+                // completed and Stop is on its way). Stamped now, so the interrupted tool's late
+                // PostToolUseFailure can't bring "working" back.
+                turnEnded(stamp: now.timeIntervalSince1970 * 1000, &s)
+                s.status = .ready
             default:
                 break
             }
@@ -232,7 +240,8 @@ public struct ClaudeEventReducer: Sendable {
         }
 
         // The tool the user was asked about has run (or failed): the prompt is gone.
-        if let pending = s.pendingPermission, pending.tool == tool, pending.detail == detail {
+        if let pending = s.pendingPermission, pending.tool == tool, pending.detail == detail,
+           pending.agentID == nil || pending.agentID == agentID {
             s.pendingPermission = nil
         }
         if let b = block, b.tool == tool, b.toolDetail == nil || b.toolDetail == detail {
@@ -254,8 +263,9 @@ public struct ClaudeEventReducer: Sendable {
             s.status = .needsYou(.question, detail: question)
             return
         }
+        let agentID = p["agent_id"]?.string.flatMap { $0.isEmpty ? nil : $0 }
         s.pendingPermission = PendingPermission(id: nextID("permission"), tool: tool, detail: detail,
-                                                receivedAt: now, canAnswer: false)
+                                                receivedAt: now, canAnswer: false, agentID: agentID)
         s.status = .needsYou(.permission, detail: Self.permissionDetail(tool: tool, detail: detail))
     }
 
@@ -305,6 +315,11 @@ public struct ClaudeEventReducer: Sendable {
         for j in s.activity.indices where s.activity[j].agentID == agentID && s.activity[j].isRunning {
             s.activity[j].isRunning = false
         }
+        if s.pendingPermission?.agentID == agentID {
+            // Its prompt ended with it.
+            s.pendingPermission = nil
+            reassertBlock(&s)
+        }
         // A background agent finishing after the main turn ended.
         if !turnActive, s.backgroundTasks > 0 {
             s.backgroundTasks -= 1
@@ -317,14 +332,18 @@ public struct ClaudeEventReducer: Sendable {
     private mutating func turnEnded(stamp: Double?, _ s: inout AgentRuntimeSnapshot) {
         turnActive = false
         if let stamp { lastTurnEndStamp = max(lastTurnEndStamp ?? stamp, stamp) }
-        clearBlocks(&s)
+        clearBlocks(&s, keepingOpenPermission: true)
         for i in s.activity.indices where s.activity[i].agentID == nil && s.activity[i].isRunning {
             s.activity[i].isRunning = false
         }
     }
 
-    private mutating func clearBlocks(_ s: inout AgentRuntimeSnapshot) {
+    /// With `keepingOpenPermission` (a main-agent turn boundary) a permission that is still open stays:
+    /// one a subagent asked for, or one whose hook is still connected and waiting for our answer (the
+    /// main agent can't end its turn while its own prompt is up).
+    private mutating func clearBlocks(_ s: inout AgentRuntimeSnapshot, keepingOpenPermission: Bool = false) {
         block = nil
+        if keepingOpenPermission, let pending = s.pendingPermission, pending.agentID != nil || pending.canAnswer { return }
         s.pendingPermission = nil
     }
 
@@ -374,6 +393,20 @@ public struct ClaudeEventReducer: Sendable {
         }
     }
 
+    /// `background_tasks[].type` labels that keep a session working after Stop: agents, which report
+    /// their end with SubagentStop (Claude's own idle logic waits for the same kinds). Shells, monitors,
+    /// MCP tasks and internal work never send one, so they must not hold "working". An entry without
+    /// a type (older versions) counts.
+    static let agentBackgroundKinds: Set<String> = ["subagent", "workflow", "teammate", "cloud session"]
+
+    static func backgroundWorkCount(_ value: JSONValue?) -> Int {
+        guard let entries = value?.array else { return 0 }
+        return entries.filter { entry in
+            guard let type = entry["type"]?.string?.lowercased(), !type.isEmpty else { return true }
+            return agentBackgroundKinds.contains(type)
+        }.count
+    }
+
     static func permissionDetail(tool: String, detail: String) -> String {
         detail.isEmpty ? tool : "\(tool): \(detail)"
     }
@@ -385,6 +418,29 @@ public struct ClaudeEventReducer: Sendable {
             if let s = value?[key]?.string, !s.isEmpty { return s }
         }
         return "unknown"
+    }
+}
+
+extension SubagentInfo {
+    /// How long a bare subagent (no task text, no tool call) is shown before it counts as a helper.
+    public static let helperGrace: TimeInterval = 3
+
+    /// No task text and no tool call yet.
+    public var isBare: Bool {
+        (description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty && toolCount == 0
+    }
+
+    /// Claude's internal helper agents show up as bare "agent" rows that never say what they do. A real
+    /// subagent gets its description or a first tool call within `helperGrace`.
+    public func isBareHelper(at now: Date) -> Bool {
+        isBare && now.timeIntervalSince(startedAt) > Self.helperGrace
+    }
+}
+
+extension AgentRuntimeSnapshot {
+    /// Running subagents worth a line in the sidebar: bare helpers past `SubagentInfo.helperGrace` are left out.
+    public func visibleRunningSubagents(at now: Date) -> [SubagentInfo] {
+        runningSubagents.filter { !$0.isBareHelper(at: now) }
     }
 }
 

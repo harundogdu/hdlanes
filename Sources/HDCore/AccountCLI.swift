@@ -5,12 +5,21 @@ import Foundation
 
 public enum AccountCLI {
     /// Credential and account-selection variables that must never leak from the app's or the user's
-    /// shell environment into a CLI run for a specific account.
-    public static let strippedVariables: [String] = [
-        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDECODE",
-        "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR",
-        "OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME",
-    ]
+    /// shell environment into a CLI run for a specific account. Built from `EnvBuilder`'s lists, so a
+    /// status check runs with the same recipe as a session.
+    public static var strippedVariables: [String] {
+        unique(EnvBuilder.claudeStripVariables + EnvBuilder.codexStripVariables)
+    }
+
+    /// `strippedVariables`, plus `EnvBuilder`'s provider switches for a managed account.
+    public static func strippedVariables(for provider: Provider, managedAccount: Bool) -> [String] {
+        unique(strippedVariables + EnvBuilder.stripVariables(for: provider, managedAccount: managedAccount))
+    }
+
+    private static func unique(_ names: [String]) -> [String] {
+        var seen = Set<String>()
+        return names.filter { seen.insert($0).inserted }
+    }
 
     private static let strippedPrefixes = ["ANTHROPIC_", "CLAUDE_CODE_", "OPENAI_", "CODEX_"]
 
@@ -44,10 +53,12 @@ public enum AccountCLI {
     }
 
     /// A shell line that runs the vendor CLI as the account even if the user's shell init exports
-    /// credentials: `env -u … [CLAUDE_CONFIG_DIR='<dir>'] claude 'auth' 'status' '--json'`.
+    /// credentials: `env -u … [CLAUDE_CONFIG_DIR='<dir>'] claude 'auth' 'status' '--json'`. A non-empty
+    /// `configDir` means a managed account (system default accounts pass nil).
     public static func commandLine(provider: Provider, configDir: String?, arguments: [String]) -> String {
         var parts = ["env"]
-        for v in strippedVariables { parts += ["-u", v] }
+        let managed = !(configDir ?? "").isEmpty
+        for v in strippedVariables(for: provider, managedAccount: managed) { parts += ["-u", v] }
         if let variable = dirVariable(for: provider), let configDir, !configDir.isEmpty {
             parts.append("\(variable)=\(quote(configDir))")
         }

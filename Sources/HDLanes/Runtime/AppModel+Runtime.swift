@@ -15,8 +15,9 @@ final class RuntimeServices {
     var warnedAboutHook = false
     /// Per Claude session: the reducer's bookkeeping next to `SessionRuntime.snapshot`.
     var reducers: [UUID: ClaudeEventReducer] = [:]
-    /// Session → the PermissionRequest hook connection waiting for our answer (at most one).
-    var permissionConnections: [UUID: HookServer.ConnectionID] = [:]
+    /// Session → the PermissionRequest hook connection waiting for our answer and the card it created
+    /// (at most one per session).
+    var permissionConnections: [UUID: PermissionWait] = [:]
     var watchers: [UUID: RolloutWatcher] = [:]
     let rolloutClaims = RolloutClaims()
     /// Throttles `AgentSession.lastActivityAt` writes (each one saves state.json).
@@ -30,6 +31,12 @@ final class RuntimeServices {
     var agentSeenInForeground: Set<UUID> = []
     /// Consecutive monitor ticks that found the shell back in the foreground.
     var shellForegroundTicks: [UUID: Int] = [:]
+}
+
+/// A PermissionRequest hook waiting for our answer, and the id of the card it created.
+struct PermissionWait: Equatable {
+    var connection: HookServer.ConnectionID
+    var permissionID: String
 }
 
 // OWNER: runtime area. Signatures are a contract used by the UI and Git areas; keep them.
@@ -238,23 +245,49 @@ extension AppModel {
         terminals.paste(sessionID, text, submit: submit)
     }
 
-    /// Answers a pending Claude permission request from the sidebar.
-    func respondToPermission(sessionID: UUID, allow: Bool, message: String?) {
-        let rt = runtime(for: sessionID)
-        guard let pending = rt.snapshot.pendingPermission else { return }
+    /// Answers the pending Claude permission request `permissionID` from the sidebar. Does nothing when
+    /// another request has replaced that card meanwhile, so a decision never lands on a request the
+    /// user didn't read.
+    func respondToPermission(sessionID: UUID, permissionID: String, allow: Bool, message: String?) {
+        guard let rt = runtimes[sessionID], let pending = rt.snapshot.pendingPermission,
+              pending.id == permissionID else { return }
         let services = runtimeServices
         var snapshot = rt.snapshot
         var reducer = services.reducers[sessionID] ?? ClaudeEventReducer()
-        if pending.canAnswer, let connection = services.permissionConnections.removeValue(forKey: sessionID) {
+        if pending.canAnswer, let wait = services.permissionConnections[sessionID] {
+            // canAnswer is only set together with the connection that created this card.
+            guard wait.permissionID == permissionID else { return }
+            services.permissionConnections[sessionID] = nil
             let note = message?.trimmingCharacters(in: .whitespacesAndNewlines)
-            services.hookServer?.reply(connection, HookReply(decision: allow ? .allow : .deny,
-                                                             message: allow || note?.isEmpty != false ? nil : note))
+            services.hookServer?.reply(wait.connection, HookReply(decision: allow ? .allow : .deny,
+                                                                  message: allow || note?.isEmpty != false ? nil : note))
             reducer.resolvePermission(in: &snapshot)
         } else {
             // The hook is gone: only Claude's own prompt in the terminal can answer now.
             snapshot.pendingPermission = nil
         }
         commit(sessionID, snapshot: snapshot, reducer: reducer)
+    }
+
+    /// Answers whichever card is pending now. Prefer `respondToPermission(sessionID:permissionID:…)`.
+    func respondToPermission(sessionID: UUID, allow: Bool, message: String?) {
+        guard let id = runtimes[sessionID]?.snapshot.pendingPermission?.id else { return }
+        respondToPermission(sessionID: sessionID, permissionID: id, allow: allow, message: message)
+    }
+
+    /// Ends the runtime side of a session: its rollout watcher (which releases its file claim), a hook
+    /// still waiting for an answer, the reducer's bookkeeping and the foreground monitor's state. The
+    /// snapshot stays. Every way a session's agent goes away (exit, quit in its shell, relaunch,
+    /// archive) runs this; a watcher left running would claim a later session's rollout file.
+    func endRuntime(_ id: UUID) {
+        let services = runtimeServices
+        services.watchers.removeValue(forKey: id)?.stop()
+        if let wait = services.permissionConnections.removeValue(forKey: id) {
+            services.hookServer?.reply(wait.connection, HookReply(decision: .none))
+        }
+        services.reducers[id] = nil
+        services.agentSeenInForeground.remove(id)
+        services.shellForegroundTicks[id] = nil
     }
 
     /// Clears the unread mark (called when the user selects the session).
@@ -302,7 +335,8 @@ extension AppModel {
 
     // Terminal callbacks (from TerminalRegistry).
     func handleTerminalTitle(sessionID: UUID, title: String) {
-        guard session(sessionID)?.provider == .codex else { return }
+        // An archived session's terminal may still be draining; it reports nothing anymore.
+        guard let session = session(sessionID), session.provider == .codex, session.isArchived != true else { return }
         let rt = runtime(for: sessionID)
         switch rt.snapshot.status {
         case .notStarted, .exited: return
@@ -321,7 +355,7 @@ extension AppModel {
     }
 
     func handleProgramStatus(sessionID: UUID, records: [TerminalProgramStatus]) {
-        guard let session = session(sessionID), session.provider.isAgent,
+        guard let session = session(sessionID), session.provider.isAgent, session.isArchived != true,
               let root = records.first(where: { $0.id.isEmpty }) else { return }
         let rt = runtime(for: sessionID)
         var snapshot = rt.snapshot
@@ -334,10 +368,7 @@ extension AppModel {
     }
 
     func handleProcessExit(sessionID: UUID, exitCode: Int32?) {
-        let services = runtimeServices
-        services.watchers.removeValue(forKey: sessionID)?.stop()
-        services.agentSeenInForeground.remove(sessionID)
-        services.shellForegroundTicks[sessionID] = nil
+        endRuntime(sessionID)
         let rt = runtime(for: sessionID)
         var snapshot = rt.snapshot
         snapshot.pendingPermission = nil
