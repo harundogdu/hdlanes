@@ -8,8 +8,9 @@ struct DiffView: View {
 
     @Environment(AppModel.self) private var model
     @State private var showAll = false
-    /// Line being annotated, by number so a refresh that shifts the array doesn't move the editor.
-    @State private var editingAnchor: String?
+    /// Copy of the line being annotated. A refresh can shift line numbers, so the editor follows the
+    /// line's text and the note is built from this copy, never from whatever row sits at the old number.
+    @State private var editingLine: DiffLine?
     @State private var draft = ""
 
     static let initialLineLimit = 3000
@@ -20,10 +21,27 @@ struct DiffView: View {
         let notes = (model.reviewNotes[sessionID] ?? []).filter { $0.filePath == file.path }
         let shown = showAll ? file.lines : Array(file.lines.prefix(Self.initialLineLimit))
         let placement = Self.place(notes, in: shown)
+        let editingRow = editingLine.flatMap { DiffLineLocator.locate($0, in: shown) }
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 fileInfo
+                if let editing = editingLine, editingRow == nil {
+                    // The line left the diff (or the shown part) while the note was being written.
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: L.noteLocation(file.path, editing.kind == .removed ? editing.oldLine : editing.newLine))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Text(verbatim: editing.text)
+                            .font(.system(size: 12, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .padding(.leading, Self.gutterWidth * 2 + Self.markerWidth)
+                    .padding(.trailing, 10)
+                    .padding(.top, 6)
+                    noteEditor
+                }
                 if !placement.unplaced.isEmpty {
                     Text(L.notesNotInDiff)
                         .font(.system(size: 11))
@@ -40,19 +58,15 @@ struct DiffView: View {
                 ForEach(shown) { line in
                     DiffLineRow(line: line) {
                         draft = ""
-                        editingAnchor = Self.anchor(line)
+                        editingLine = line
                     }
                     ForEach(placement.byLine[line.id] ?? []) { note in
                         NoteBubble(note: note, location: nil, leading: Self.gutterWidth * 2 + Self.markerWidth) {
                             model.removeReviewNote(note.id, from: sessionID)
                         }
                     }
-                    if let anchor = editingAnchor, anchor == Self.anchor(line) {
-                        NoteEditor(text: $draft) {
-                            addNote(on: line)
-                        } onCancel: {
-                            editingAnchor = nil
-                        }
+                    if let editingRow, editingRow.id == line.id {
+                        noteEditor
                     }
                 }
                 if !showAll && file.lines.count > Self.initialLineLimit {
@@ -67,6 +81,21 @@ struct DiffView: View {
                 }
             }
             .padding(.bottom, 8)
+        }
+        .onChange(of: file.lines) { _, lines in
+            // Follow the line being annotated to its new number, so the next refresh looks near it.
+            if let editing = editingLine, let row = DiffLineLocator.locate(editing, in: lines) {
+                editingLine = DiffLine(id: row.id, kind: editing.kind, text: editing.text,
+                                       oldLine: row.oldLine, newLine: row.newLine)
+            }
+        }
+    }
+
+    private var noteEditor: some View {
+        NoteEditor(text: $draft) {
+            addNote()
+        } onCancel: {
+            editingLine = nil
         }
     }
 
@@ -100,43 +129,30 @@ struct DiffView: View {
         return out
     }
 
-    private func addNote(on line: DiffLine) {
+    /// Builds the note from the remembered line, at the number its text has in the current diff.
+    private func addNote() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        let note = ReviewNote(filePath: file.path, line: line.kind == .removed ? nil : line.newLine,
-                              lineText: line.text, text: text, oldLine: line.oldLine)
+        guard !text.isEmpty, let editing = editingLine else { return }
+        let at = DiffLineLocator.locate(editing, in: file.lines) ?? editing
+        let note = ReviewNote(filePath: file.path, line: editing.kind == .removed ? nil : at.newLine,
+                              lineText: editing.text, text: text, oldLine: at.oldLine)
         model.addReviewNote(note, to: sessionID)
-        editingAnchor = nil
+        editingLine = nil
         draft = ""
     }
 
-    /// `n12` for a line that exists in the new file, `o7` for a removed line, nil for headers.
-    static func anchor(_ line: DiffLine) -> String? {
-        switch line.kind {
-        case .context, .added: return line.newLine.map { "n\($0)" }
-        case .removed: return line.oldLine.map { "o\($0)" }
-        case .hunkHeader, .meta: return nil
-        }
-    }
-
-    /// Attaches notes to the line they were written on: by new-file number, or by old-file number for
-    /// removed lines. Notes whose line is not in `lines` are returned separately.
+    /// Attaches notes to the row that shows their line's text, nearest their recorded number. Notes whose
+    /// line is not in `lines` are returned separately.
     static func place(_ notes: [ReviewNote], in lines: [DiffLine]) -> (byLine: [Int: [ReviewNote]], unplaced: [ReviewNote]) {
         guard !notes.isEmpty else { return ([:], []) }
-        var byNew: [Int: Int] = [:]
-        var byOld: [Int: Int] = [:]
-        for line in lines {
-            switch line.kind {
-            case .context, .added: if let n = line.newLine, byNew[n] == nil { byNew[n] = line.id }
-            case .removed: if let o = line.oldLine, byOld[o] == nil { byOld[o] = line.id }
-            case .hunkHeader, .meta: break
-            }
-        }
         var placed: [Int: [ReviewNote]] = [:]
         var unplaced: [ReviewNote] = []
         for note in notes {
-            let target = note.line.flatMap { byNew[$0] } ?? (note.line == nil ? note.oldLine.flatMap { byOld[$0] } : nil)
-            if let target { placed[target, default: []].append(note) } else { unplaced.append(note) }
+            if let row = DiffLineLocator.locateNote(newLine: note.line, oldLine: note.oldLine, text: note.lineText, in: lines) {
+                placed[row.id, default: []].append(note)
+            } else {
+                unplaced.append(note)
+            }
         }
         return (placed, unplaced)
     }

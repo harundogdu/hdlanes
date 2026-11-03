@@ -105,6 +105,20 @@ extension L {
     static var sendNotesNoNotes: String { pick("Add notes on diff lines first.", "Önce fark satırlarına not ekle.") }
     static var sendNotesNotRunning: String { pick("Start the agent to send notes.", "Not göndermek için ajanı başlat.") }
     static var sendNotesNoAgent: String { pick("This session has no agent.", "Bu oturumda ajan yok.") }
+    static var sendNotesStarting: String {
+        pick("The agent is still starting. Send the notes once it's ready.", "Ajan hâlâ başlıyor. Hazır olunca notları gönder.")
+    }
+    static var sendNotesAwaitingAnswer: String {
+        pick("The agent is waiting for an answer in the terminal. Answer it first.",
+             "Ajan terminalde bir yanıt bekliyor. Önce onu yanıtla.")
+    }
+    static func describe(_ block: ReviewSendBlock) -> String {
+        switch block {
+        case .notRunning: return sendNotesNotRunning
+        case .starting: return sendNotesStarting
+        case .awaitingAnswer: return sendNotesAwaitingAnswer
+        }
+    }
     static var sendNotesHelp: String {
         pick("Paste all notes into the agent as one message", "Tüm notları ajana tek mesaj olarak yapıştır")
     }
@@ -192,6 +206,70 @@ extension L {
     }
     static var detectedURLsHelp: String { pick("Seen in the terminal output", "Terminal çıktısında görüldü") }
 
+    // MARK: Removing a worktree
+
+    static var worktreeRemoveConfirmTitle: String { pick("Remove the worktree anyway?", "Worktree yine de kaldırılsın mı?") }
+    static var worktreeRemoveConfirmButton: String { pick("Remove Anyway", "Yine de Kaldır") }
+
+    static func worktreeRemoveConfirmBody(path: String, risks: WorktreeRemovalRisks) -> String {
+        var lines = [pick("Removing \(path) deletes these for good:", "\(path) kaldırılırsa bunlar kalıcı olarak silinir:")]
+        lines += worktreeRiskLines(risks)
+        lines.append("")
+        lines.append(worktreeCommitsFate(risks))
+        return lines.joined(separator: "\n")
+    }
+
+    static func worktreeRiskLines(_ r: WorktreeRemovalRisks) -> [String] {
+        var out: [String] = []
+        if !r.uncommitted.isEmpty {
+            let n = r.uncommitted.count
+            out.append("\u{2022} " + pick(n == 1 ? "1 uncommitted change: " : "\(n) uncommitted changes: ",
+                                           "Commit edilmemiş \(n) değişiklik: ") + pathSample(r.uncommitted))
+        }
+        if !r.ignored.isEmpty {
+            let n = r.ignored.count
+            out.append("\u{2022} " + pick(n == 1 ? "1 gitignored file: " : "\(n) gitignored files: ",
+                                           "Git'in yok saydığı \(n) dosya: ") + pathSample(r.ignored))
+        }
+        for op in r.operations { out.append("\u{2022} " + operationInProgress(op)) }
+        return out
+    }
+
+    static func pathSample(_ paths: [String], limit: Int = 5) -> String {
+        let shown = paths.prefix(limit).joined(separator: ", ")
+        guard paths.count > limit else { return shown }
+        let more = paths.count - limit
+        return shown + pick(", and \(more) more", " ve \(more) tane daha")
+    }
+
+    static func operationInProgress(_ op: GitOperation) -> String {
+        switch op {
+        case .rebase: return pick("An unfinished rebase", "Yarım kalmış bir rebase")
+        case .merge: return pick("An unfinished merge", "Yarım kalmış bir merge")
+        case .cherryPick: return pick("An unfinished cherry-pick", "Yarım kalmış bir cherry-pick")
+        case .revert: return pick("An unfinished revert", "Yarım kalmış bir revert")
+        case .bisect: return pick("A bisect in progress", "Süren bir bisect")
+        }
+    }
+
+    /// What happens to commits: kept on their branch, or saved to a rescue branch when HEAD is detached.
+    static func worktreeCommitsFate(_ r: WorktreeRemovalRisks) -> String {
+        guard let branch = r.rescueBranch else {
+            return pick("Committed work stays in the repository.", "Commit edilmiş işler depoda kalır.")
+        }
+        let n = r.unreachableCommits
+        return pick(n == 1 ? "HEAD is detached: its 1 commit that is on no branch is saved to the new branch \(branch) first."
+                           : "HEAD is detached: its \(n) commits that are on no branch are saved to the new branch \(branch) first.",
+                    "HEAD ayrık: hiçbir dalda olmayan \(n) commit önce yeni \(branch) dalına kaydedilir.")
+    }
+
+    static var worktreeRescuedTitle: String { pick("Commits saved to a new branch", "Commit'ler yeni bir dala kaydedildi") }
+    static func worktreeRescuedMessage(branch: String, count: Int) -> String {
+        pick(count == 1 ? "The removed worktree had 1 commit on no branch (detached HEAD). It is kept on the branch \(branch)."
+                        : "The removed worktree had \(count) commits on no branch (detached HEAD). They are kept on the branch \(branch).",
+             "Kaldırılan worktree'de hiçbir dalda olmayan \(count) commit vardı (ayrık HEAD). \(branch) dalında duruyorlar.")
+    }
+
     // MARK: Branch names
 
     static func describe(_ problem: BranchNameProblem) -> String {
@@ -243,10 +321,8 @@ extension L {
             return pick("Couldn't find the base “\(ref)” in this repository.", "Bu depoda “\(ref)” tabanı bulunamadı.")
         case .branchInUse(let branch, let path):
             return pick("Branch \(branch) is already checked out at \(path).", "\(branch) dalı zaten \(path) konumunda açık.")
-        case .worktreeDirty(_, let count, let sample):
-            let list = sample.joined(separator: ", ") + (count > sample.count ? ", …" : "")
-            return pick("The worktree has \(count) uncommitted \(count == 1 ? "change" : "changes") (\(list)). Removing it deletes them.",
-                        "Çalışma ağacında commit edilmemiş \(count) değişiklik var (\(list)). Kaldırılırsa silinir.")
+        case .worktreeDirty(let path, let risks):
+            return worktreeRemoveConfirmBody(path: path, risks: risks)
         case .sessionNotFound:
             return inspectorSessionMissing
         case .noBranch:

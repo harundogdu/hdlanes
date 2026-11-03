@@ -211,7 +211,7 @@ struct ChangesFooter: View {
 
     var body: some View {
         let notes = model.reviewNotes[sessionID] ?? []
-        let sendProblem = self.sendProblem(notes: notes)
+        let sendProblem = model.reviewNotesSendProblem(sessionID)
         HStack(spacing: 8) {
             Text(L.notesCount(notes.count))
                 .font(.system(size: 11))
@@ -238,22 +238,15 @@ struct ChangesFooter: View {
         .controlSize(.small)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .task(id: sessionID) { prInfo = await model.pullRequestInfo(sessionID: sessionID) }
+        // Re-checked when the live branch changes (the diff refresh records it on the session).
+        .task(id: "\(sessionID)|\(model.session(sessionID)?.branch ?? "")") {
+            prInfo = await model.pullRequestInfo(sessionID: sessionID)
+        }
         .sheet(isPresented: $isPRSheetPresented, onDismiss: {
             Task { prInfo = await model.pullRequestInfo(sessionID: sessionID) }
         }) {
             PullRequestSheet(sessionID: sessionID)
                 .environment(model)
-        }
-    }
-
-    private func sendProblem(notes: [ReviewNote]) -> String? {
-        if notes.isEmpty { return L.sendNotesNoNotes }
-        guard let session = model.session(sessionID), session.provider.isAgent else { return L.sendNotesNoAgent }
-        guard let runtime = model.runtimes[sessionID], runtime.isProcessRunning else { return L.sendNotesNotRunning }
-        switch runtime.status {
-        case .notStarted, .exited: return L.sendNotesNotRunning
-        default: return nil
         }
     }
 }

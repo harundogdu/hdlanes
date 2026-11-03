@@ -95,16 +95,17 @@ extension AppModel {
     func closeSession(_ id: UUID, removeWorktree: Bool) async {
         do {
             try await closeSessionThrowing(id, removeWorktree: removeWorktree)
-        } catch GitError.worktreeDirty(let path, let count, let sample) {
-            // Uncommitted work would be lost: ask before forcing. The branch and its commits stay.
+        } catch GitError.worktreeDirty(let path, let risks) {
+            // Files would be lost: say which and ask before forcing. Nothing was stopped yet.
             let alert = NSAlert()
-            alert.messageText = L.worktreeDirtyConfirmTitle(count)
-            alert.informativeText = L.worktreeDirtyConfirmBody(path: path, sample: sample)
-            alert.addButton(withTitle: L.worktreeDirtyConfirmRemove)
+            alert.messageText = L.worktreeRemoveConfirmTitle
+            alert.informativeText = L.worktreeRemoveConfirmBody(path: path, risks: risks)
+            alert.addButton(withTitle: L.worktreeRemoveConfirmButton)
             alert.addButton(withTitle: L.cancel)
             alert.alertStyle = .critical
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             do {
+                stop(id)
                 try await self.removeWorktree(sessionID: id, force: true)
                 archiveSession(id)
             } catch {
@@ -213,12 +214,16 @@ extension AppModel {
         return L.defaultSessionTitle(provider, n)
     }
 
-    /// The work behind `closeSession`. When the worktree can't be removed the session stays (stopped).
+    /// The work behind `closeSession`. When the worktree holds work that removal would lose, this throws
+    /// `GitError.worktreeDirty` before anything is stopped, so the session and its agent keep running.
     func closeSessionThrowing(_ id: UUID, removeWorktree: Bool) async throws {
         guard let session = session(id) else { return }
-        stop(id)
-        if removeWorktree, session.worktreePath != nil {
-            // On failure the terminal (and its shell) stays, so the session is left as it was.
+        if removeWorktree, let path = session.worktreePath {
+            if let risks = try await worktreeRemovalRisks(sessionID: id), risks.needsConfirmation {
+                throw GitError.worktreeDirty(path: path, risks: risks)
+            }
+            stop(id)
+            // Checks again: anything written after the first look still stops a non-forced removal.
             try await self.removeWorktree(sessionID: id, force: false)
         }
         archiveSession(id)
