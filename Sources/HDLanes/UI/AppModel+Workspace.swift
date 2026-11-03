@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import HDCore
 
@@ -38,6 +39,7 @@ enum WorkspaceError: LocalizedError, Equatable {
     case commandFailed(String)
     case aiDisabled
     case aiUnreadable
+    case invalidBranch(String)
 
     var errorDescription: String? {
         switch self {
@@ -52,6 +54,7 @@ enum WorkspaceError: LocalizedError, Equatable {
         case .commandFailed(let line): return line
         case .aiDisabled: return L.errAIDisabled
         case .aiUnreadable: return L.errAIUnreadable
+        case .invalidBranch(let problem): return problem
         }
     }
 }
@@ -92,6 +95,21 @@ extension AppModel {
     func closeSession(_ id: UUID, removeWorktree: Bool) async {
         do {
             try await closeSessionThrowing(id, removeWorktree: removeWorktree)
+        } catch GitError.worktreeDirty(let path, let count, let sample) {
+            // Uncommitted work would be lost: ask before forcing. The branch and its commits stay.
+            let alert = NSAlert()
+            alert.messageText = L.worktreeDirtyConfirmTitle(count)
+            alert.informativeText = L.worktreeDirtyConfirmBody(path: path, sample: sample)
+            alert.addButton(withTitle: L.worktreeDirtyConfirmRemove)
+            alert.addButton(withTitle: L.cancel)
+            alert.alertStyle = .critical
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            do {
+                try await self.removeWorktree(sessionID: id, force: true)
+                archiveSession(id)
+            } catch {
+                show(error: error, title: L.removeWorktreeFailed)
+            }
         } catch {
             show(error: error, title: L.removeWorktreeFailed)
         }
@@ -151,10 +169,25 @@ extension AppModel {
         var session = AgentSession(projectID: project.id, title: title, provider: request.provider,
                                    accountID: accountID, cwd: project.path)
         if request.useWorktree {
-            let branch = request.branch?.nilIfBlank ?? SessionNaming.branchSlug(from: title)
+            var branch: String
+            if let typed = request.branch?.nilIfBlank {
+                branch = typed
+            } else {
+                branch = await suggestedBranchName(title: title, project: project)
+            }
+            if let problem = branchNameProblem(branch) { throw WorkspaceError.invalidBranch(problem) }
             let result = try await createWorktree(project: project, branch: branch,
                                                   baseRef: request.baseRef?.nilIfBlank)
-            session.cwd = result.path
+            // A project in a subfolder of its repo keeps working in the same subfolder of the worktree.
+            if let repo = await repositoryRoot(for: project.path) {
+                let sub = Self.subpath(of: project.path, in: repo)
+                session.cwd = sub.isEmpty ? result.path : (result.path as NSString).appendingPathComponent(sub)
+            } else {
+                session.cwd = result.path
+            }
+            if !result.copyFailures.isEmpty {
+                alert = AppAlert(title: L.copyFilesFailedTitle, message: result.copyFailures.joined(separator: "\n"))
+            }
             session.branch = result.branch
             session.baseRef = result.baseRef
             session.worktreePath = result.path
@@ -166,7 +199,7 @@ extension AppModel {
         session.taskID = task?.id
         session.category = task?.category ?? Categorizer.categorize(title: title, prompt: prompt, branch: session.branch)
         session.initialPrompt = prompt
-        session.lastActivityAt = Date()
+        // lastActivityAt stays nil: launch() treats nil as "first launch" and sends the prompt and setup.
 
         state.sessions.append(session)
         if let task, task.status != .active { updateTask(task.id) { $0.status = .active } }

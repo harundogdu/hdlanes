@@ -141,6 +141,11 @@ struct NewSessionSheet: View {
             if useWorktree && isGitRepo {
                 TextField(L.branch, text: Binding(get: { branch }, set: { branch = $0; branchEdited = true }))
                     .font(Theme.mono)
+                if branchEdited, let problem = model.branchNameProblem(branch), !branch.isEmpty {
+                    Text(problem)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                }
                 Picker(L.baseBranch, selection: $baseRef) {
                     if branches.isEmpty { Text(L.currentHead).tag(String?.none) }
                     ForEach(branches, id: \.self) { b in
@@ -214,6 +219,13 @@ struct NewSessionSheet: View {
     private func autoBranch() {
         guard !branchEdited else { return }
         branch = SessionNaming.branchSlug(from: effectiveTitle)
+        // Refine with the git area's planner: hd/<slug>, unique against existing branches.
+        guard let p = model.project(projectID) else { return }
+        let title = effectiveTitle
+        Task {
+            let suggested = await model.suggestedBranchName(title: title, project: p)
+            if !branchEdited && title == effectiveTitle { branch = suggested }
+        }
     }
 
     private func loadRepoInfo() async {
