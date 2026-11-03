@@ -136,8 +136,12 @@ extension AppModel {
                     guard let found = await projectForImport(cwd: c.cwd) else { continue }
                     projectID = found
                 }
+                // The account it ran on may have been removed since; the folder that holds the transcript
+                // belongs to item.accountID, so resume there.
+                let accountID = account(old.accountID) == nil ? item.accountID : old.accountID
                 updateSession(archivedID) {
                     $0.projectID = projectID
+                    $0.accountID = accountID
                     $0.isArchived = nil
                 }
                 imported.append((archivedID, c.lastActivity))

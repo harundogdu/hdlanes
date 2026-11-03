@@ -308,7 +308,7 @@ public enum ImportScanner {
             for m in regex.matches(in: line, range: NSRange(location: 0, length: ns.length)) {
                 let name = ns.substring(with: m.range(at: 1))
                 let rest = ns.substring(from: m.range.location + m.range.length)
-                guard let word = shellWord(rest), let value = expandHome(word, home: home) else { continue }
+                guard let word = shellWord(rest), let value = expandHome(word, home: home, quote: rest.first) else { continue }
                 let provider: Provider = name == "CODEX_HOME" ? .codex : .claude
                 if !result.contains(where: { $0.0 == provider && $0.1 == value }) { result.append((provider, value)) }
             }
@@ -350,9 +350,17 @@ public enum ImportScanner {
     }
 
     /// Absolute path with a leading `~`, `$HOME` or `${HOME}` expanded; nil for anything else dynamic.
-    static func expandHome(_ value: String, home: String) -> String? {
+    /// The shell expands nothing inside single quotes and no `~` inside double quotes, so those values
+    /// reach Claude literally (and a literal "~/…" is not a usable config dir): skip them.
+    static func expandHome(_ value: String, home: String, quote: Character? = nil) -> String? {
         var v = value
-        for prefix in ["${HOME}", "$HOME", "~"] where v == prefix || v.hasPrefix(prefix + "/") {
+        let prefixes: [String]
+        switch quote {
+        case "'": prefixes = []
+        case "\"": prefixes = ["${HOME}", "$HOME"]
+        default: prefixes = ["${HOME}", "$HOME", "~"]
+        }
+        for prefix in prefixes where v == prefix || v.hasPrefix(prefix + "/") {
             v = home + v.dropFirst(prefix.count)
             break
         }
@@ -405,21 +413,38 @@ public enum ImportScanner {
             }
         }
         var result: [SessionCandidate] = []
+        var seen = Set<String>()
         for file in files.sorted(by: { $0.modified > $1.modified }) {
             if result.count >= limit { break }
             let id = String((file.path as NSString).lastPathComponent.dropLast(".jsonl".count))
+            // The same conversation can sit under two project folders (repo and a worktree); keep the newest.
+            guard !seen.contains(id) else { continue }
+            let projectDir = ((file.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
             if let s = parseClaudeTranscript(file: file, sessionID: id, includeHeadless: includeHeadless,
-                                             chunkBytes: chunkBytes) {
+                                             chunkBytes: chunkBytes, projectDir: projectDir) {
+                seen.insert(id)
                 result.append(s)
             }
         }
         return result
     }
 
+    /// Claude Code's project folder name for a cwd: every character other than an ASCII letter or digit
+    /// becomes "-" (`/Users/x/my.app` → `-Users-x-my-app`).
+    public static func claudeProjectDirName(for cwd: String) -> String {
+        String(cwd.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" })
+    }
+
     static func parseClaudeTranscript(file: ListedFile, sessionID: String, includeHeadless: Bool,
-                                      chunkBytes: Int) -> SessionCandidate? {
+                                      chunkBytes: Int, projectDir: String? = nil) -> SessionCandidate? {
         guard let chunks = readChunks(path: file.path, from: 0, size: file.size, chunkBytes: chunkBytes) else { return nil }
         var cwd: String?
+        // A transcript can record several cwds; resume only finds it from the one its folder is named after.
+        func matches(_ c: String?) -> Bool { projectDir == nil || c.map { claudeProjectDirName(for: $0) == projectDir } == true }
+        func offer(_ c: String?) {
+            guard let c = nonEmpty(c) else { return }
+            if cwd == nil || (!matches(cwd) && matches(c)) { cwd = c }
+        }
         var entrypoint: String?
         var branch: String?
         var startedAt: Date?
@@ -436,11 +461,11 @@ public enum ImportScanner {
             let isTitle = contains(line, titleMarker)
             let isLastPrompt = contains(line, lastPromptMarker)
             // User lines can be large (tool results): stop decoding them once everything is known.
-            let wantUser = isUser && (firstPrompt == nil || cwd == nil)
+            let wantUser = isUser && (firstPrompt == nil || cwd == nil || !matches(cwd))
             guard wantUser || isTitle || isLastPrompt, let json = decode(line) else { continue }
             switch json["type"]?.string {
             case "user":
-                if cwd == nil { cwd = nonEmpty(json["cwd"]?.string) }
+                offer(json["cwd"]?.string)
                 if entrypoint == nil { entrypoint = nonEmpty(json["entrypoint"]?.string) }
                 if branch == nil { branch = nonEmpty(json["gitBranch"]?.string) }
                 if startedAt == nil { startedAt = json["timestamp"]?.string.flatMap(CodexRollout.parseDate) }
@@ -475,7 +500,7 @@ public enum ImportScanner {
                 // The branch the conversation ended on.
                 tailUserSeen = true
                 if let b = nonEmpty(json["gitBranch"]?.string) { branch = b }
-                if cwd == nil { cwd = nonEmpty(json["cwd"]?.string) }
+                offer(json["cwd"]?.string)
                 if entrypoint == nil { entrypoint = nonEmpty(json["entrypoint"]?.string) }
             default:
                 break

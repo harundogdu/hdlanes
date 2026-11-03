@@ -171,7 +171,7 @@ extension AppModel {
         guard let account = account(id), account.provider == provider else { throw WorkspaceError.notManaged }
         guard !account.isSystemDefault, let dir = account.configDir else { throw WorkspaceError.notManaged }
         let url = URL(fileURLWithPath: dir, isDirectory: true)
-        try HDPaths.ensurePrivateDir(url)
+        if isInsideAccountsDir(dir) { try HDPaths.ensurePrivateDir(url) }
         return (account, url)
     }
 

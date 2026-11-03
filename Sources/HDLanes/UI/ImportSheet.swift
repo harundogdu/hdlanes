@@ -351,7 +351,8 @@ private struct ImportSessionsTab: View {
     }
 
     private var selected: [ImportableSession] {
-        sheet.sessions.filter { $0.isSelectable && sheet.selectedSessions.contains($0.id) }
+        // Only rows the current search and filters show: hidden ones are never imported behind the user's back.
+        visible.filter { $0.isSelectable && sheet.selectedSessions.contains($0.id) }
     }
 
     var body: some View {

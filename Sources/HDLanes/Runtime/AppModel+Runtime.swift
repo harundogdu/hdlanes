@@ -148,7 +148,7 @@ extension AppModel {
                 return
             }
             // CODEX_HOME must exist; creating a missing Claude dir only means "logged out".
-            try? HDPaths.ensurePrivateDir(URL(fileURLWithPath: dir, isDirectory: true))
+            prepareAccountDir(dir)
         }
 
         // Initial prompt and setup command belong to the very first launch only.
@@ -325,13 +325,20 @@ extension AppModel {
     func loginSpec(account: Account, flow: EnvBuilder.LoginFlow, cwd: String) -> LaunchSpec {
         let env = ProcessInfo.processInfo.environment
         if !account.isSystemDefault, let dir = account.configDir, !dir.isEmpty {
-            try? HDPaths.ensurePrivateDir(URL(fileURLWithPath: dir, isDirectory: true))
+            prepareAccountDir(dir)
         }
         if let spec = EnvBuilder.loginSpec(provider: account.provider, flow: flow, account: account,
                                            doneNotice: L.loginFinished, cwd: cwd, processEnv: env) {
             return spec
         }
         return LaunchSpec(executable: EnvBuilder.userShell(env), args: ["-l", "-i"], environment: environment(for: account), cwd: cwd)
+    }
+
+    /// Creates (0700) a folder hdlanes owns. An imported folder the user also uses from the terminal or
+    /// an editor is never chmod'ed or recreated.
+    func prepareAccountDir(_ dir: String) {
+        guard isInsideAccountsDir(dir) else { return }
+        try? HDPaths.ensurePrivateDir(URL(fileURLWithPath: dir, isDirectory: true))
     }
 
     func usage(for accountID: UUID) -> AccountUsage? { state.usage[accountID.uuidString] }

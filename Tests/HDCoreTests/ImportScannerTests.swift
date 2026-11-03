@@ -456,3 +456,18 @@ private extension ImportScanner.ChosenFolderResult {
         return false
     }
 }
+
+struct ImportScannerFixTests {
+    @Test func claudeProjectDirNameMatchesClaudeEncoding() {
+        #expect(ImportScanner.claudeProjectDirName(for: "/Users/x/git/ios-apps") == "-Users-x-git-ios-apps")
+        #expect(ImportScanner.claudeProjectDirName(for: "/tmp/a.b_c d") == "-tmp-a-b-c-d")
+    }
+
+    @Test func quotedTildeIsNotExpandedButDoubleQuotedHomeIs() {
+        let home = "/Users/x"
+        #expect(ImportScanner.parseShellProfile("export CLAUDE_CONFIG_DIR='~/.claude-2'", home: home).isEmpty)
+        #expect(ImportScanner.parseShellProfile("export CLAUDE_CONFIG_DIR=\"~/.claude-2\"", home: home).isEmpty)
+        #expect(ImportScanner.parseShellProfile("export CLAUDE_CONFIG_DIR=\"$HOME/.claude-2\"", home: home).map(\.1) == ["/Users/x/.claude-2"])
+        #expect(ImportScanner.parseShellProfile("alias c2='CLAUDE_CONFIG_DIR=~/.claude-2 claude'", home: home).map(\.1) == ["/Users/x/.claude-2"])
+    }
+}
