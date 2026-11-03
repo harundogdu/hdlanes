@@ -36,6 +36,7 @@ enum LoginFlow: Identifiable, Equatable {
 struct AccountsView: View {
     @Environment(AppModel.self) private var model
     @State private var showAdd = false
+    @State private var showImport = false
 
     var body: some View {
         Form {
@@ -58,6 +59,8 @@ struct AccountsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer()
+                    Button(L.importExistingAccountEllipsis) { showImport = true }
+                        .help(L.importAccountsFootnote)
                     Button(L.addAccountEllipsis) { showAdd = true }
                 }
             }
@@ -65,6 +68,7 @@ struct AccountsView: View {
         .formStyle(.grouped)
         .task { await model.refreshAllAccountHealth() }
         .sheet(isPresented: $showAdd) { AddAccountSheet() }
+        .sheet(isPresented: $showImport) { ImportSheet(preset: ImportPreset(tab: .accounts)) }
     }
 }
 
@@ -120,7 +124,8 @@ private struct AccountRow: View {
                     .help(L.checkHelp)
                 Button(L.removeEllipsis) { confirmRemove = true }
                     .disabled(account.isSystemDefault || users > 0)
-                    .help(account.isSystemDefault ? L.errSystemAccount : (users > 0 ? L.errAccountInUse(users) : L.removeAccountHelp))
+                    .help(account.isSystemDefault ? L.errSystemAccount
+                          : (users > 0 ? L.errAccountInUse(users) : (trashesFolder ? L.removeAccountHelp : L.forgetAccountHelp)))
             }
             .controlSize(.small)
         }
@@ -128,14 +133,19 @@ private struct AccountRow: View {
         .onAppear { labelDraft = account.label }
         .onChange(of: account.label) { _, new in labelDraft = new }
         .confirmationDialog(L.removeAccountTitle(account.label), isPresented: $confirmRemove, titleVisibility: .visible) {
-            Button(L.moveToTrash, role: .destructive, action: remove)
+            Button(trashesFolder ? L.moveToTrash : L.remove, role: .destructive, action: remove)
             Button(L.cancel, role: .cancel) {}
         } message: {
-            Text(L.removeAccountMessage(account.configDir ?? ""))
+            // removeAccount only trashes folders hdlanes created; an imported folder stays.
+            Text(trashesFolder ? L.removeAccountMessage(account.configDir ?? "") : L.forgetAccountMessage(account.configDir ?? ""))
         }
         .sheet(item: $flow) { flow in
             LoginSheet(accountID: account.id, flow: flow)
         }
+    }
+
+    private var trashesFolder: Bool {
+        account.configDir.map(model.isInsideAccountsDir) ?? false
     }
 
     private func commitLabel() {

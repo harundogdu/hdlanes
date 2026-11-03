@@ -13,6 +13,8 @@ struct AppCommands: Commands {
                 .keyboardShortcut("t", modifiers: .command)
             Divider()
             Button(L.addProjectEllipsis) { Task { await Panels.addProject(model: model) } }
+            Button(L.importEllipsis) { model.importPreset = ImportPreset(tab: .sessions) }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
         }
         CommandGroup(after: .sidebar) {
             Button(L.showBoard) { model.selection = .board }

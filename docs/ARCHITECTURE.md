@@ -183,6 +183,64 @@ its newest rollout file's last `token_count` (passive, no token use).
 Needs-you for Codex: terminal title / OSC 7501 `blocked` (title containing "Action Required" or
 "approval"). There are no Codex hooks in v0.1.
 
+## Import (workspace area)
+
+`HDCore/ImportScanner.swift` (pure, file-system reads only, every root a parameter, tested with temp
+dirs), `UI/AppModel+Import.swift`, `UI/ImportSheet.swift`, `UI/L10n+Import.swift`. Opened from File ›
+Import… (⇧⌘I, `AppModel.importPreset`), the welcome screen, a project's context menu (Sessions tab,
+search prefilled with the project path) and the accounts list (Accounts tab).
+
+**Account folders.** Sources, all optional:
+- VS Code-family settings `~/Library/Application Support/{Code,Code - Insiders,Cursor,Windsurf,VSCodium}/User/settings.json`
+  (JSONC: comments stripped outside strings): `{"name":"CLAUDE_CONFIG_DIR","value":"…"}` in either key
+  order (`claudeCode.environmentVariables`) and `"CLAUDE_CONFIG_DIR": "…"` keys (terminal env); same for
+  `CODEX_HOME`. Absolute values only, verbatim.
+- Shell profiles `~/.zshrc ~/.zprofile ~/.zshenv ~/.bashrc ~/.bash_profile ~/.profile`: `VAR=<value>`
+  anywhere in a non-comment line (exports, assignments, alias bodies), quoted or bare. A leading `~`,
+  `$HOME`, `${HOME}` is expanded; any other `$` or a backquote skips the value. Only these two variables
+  are extracted; nothing else from these files is kept or logged.
+- `~/.claude*` / `~/.codex*` dirs (not `.claude`/`.codex`) that look like one: Claude has `.claude.json`,
+  `projects/` or `settings.json`; Codex has `auth.json`, `config.toml` or `sessions/`. Stored as the plain
+  path; merged into a shell/editor candidate naming the same folder (that string wins).
+- A folder the user picks (provider from the markers above, else asked).
+
+The string from a profile or editor setting is kept byte-exact (trailing slash too): it becomes the
+account's `configDir`, and Claude's Keychain key hashes it. Dedupe by exact string. Excluded: missing
+dirs, `~/.claude` / `~/.codex` (with or without trailing slash), anything under `~/.hdlanes/accounts`, and
+dirs an account already uses (exact match; home and chosen folders also trailing-slash-insensitive). An
+imported account is `isSystemDefault: false`, `authMethod: .existing`, label from the folder name
+(`.claude-work` → "Claude work"); its health is checked like any other. Removing it only forgets it:
+`removeAccount` trashes nothing outside `~/.hdlanes/accounts`, and the dialog says the folder stays.
+
+**Sessions.** Claude: `<configDir>/projects/<encoded-cwd>/<session-uuid>.jsonl`, top level only
+(`<uuid>/` subfolders hold subagents); `~/.claude` for the system account. Codex: rollout files as
+above (`.zst` skipped, sub-agent threads skipped via `CodexRollout.isChildThread`), titles from
+`<codexHome>/session_index.jsonl` (`{id, thread_name}`) when present. Newest first by file mtime, within
+the chosen window, at most 400 per account. A file is never read whole when it is over 512 KB: only its
+first and last 256 KB (median transcript 1.6 MB, largest seen 1.3 GB); partial lines at the cuts are
+dropped. Claude fields:
+- `cwd`, `entrypoint`, `gitBranch` from `"user"` records; the branch of the last non-sidechain user
+  record wins. Entrypoints: `claude-desktop`, `claude-vscode`, `cli`; `sdk-*` (`claude -p`) is headless
+  and hidden unless asked for. Codex: originator `Codex Desktop` / `codex_vscode` / `codex-tui`,
+  `source: "exec"` is headless (Codex Desktop writes `source: "vscode"`, so the originator decides).
+- First prompt: first `"user"` record with `isSidechain != true`, `isMeta != true` whose content (string,
+  or the first `{type:"text"}` block) doesn't start with `<` (command/caveat/reminder wrappers) and isn't
+  tool-result only.
+- Title: the last `custom-title` in the tail chunk, else in the head, else the first prompt, else the
+  `last-prompt` record; first line, 80 characters.
+
+Importing a session: project = the one whose path contains the cwd (deepest; component boundaries), else
+the one whose worktree folder contains it, else `addProjectReturningID(cwd)` (repository root, deduped);
+shorter cwds are imported first so a repo's own sessions create its project. The `AgentSession` gets
+`agentSessionID`, `branch`, `lastActivityAt` = file mtime (non-nil, so it is never treated as a first
+launch), `createdAt` = first record time, a `Categorizer` category, no `initialPrompt`, no
+`worktreePath`. It is not launched; the sidebar shows it as not running and Resume runs
+`claude --resume <id>` / `codex resume <id>` in its cwd with the account's env. A session id already in
+the sidebar is shown as added; one that was closed (archived) is brought back instead of duplicated.
+Sessions whose cwd no longer exists are counted, not listed. Known limit: `repositoryRoot` of a linked
+worktree is the worktree itself, so a session in a worktree outside any project's folder becomes its own
+project.
+
 ## Areas and ownership (v0.1 build-out)
 
 | Area | Files | Contract |
@@ -190,7 +248,7 @@ Needs-you for Codex: terminal title / OSC 7501 `blocked` (title containing "Acti
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
-| workspace | `UI/*`, `HDCore/Categorizer.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
+| workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 
 Cross-area calls go only through the signatures in those three `AppModel+*.swift` files. Do not edit
 another area's files; if you need something from another area, call its contract method.
@@ -206,5 +264,5 @@ another area's files; if you need something from another area, call its contract
 - Every list has an empty state with one sentence + one action. Every async action has a progress state
   and an error state (`model.show(error:title:)` or inline). No dead buttons: disable with a tooltip
   (`.help`) when unavailable.
-- Keyboard first: ⌘N new session, ⌘T new task, ⌘1…⌘9 select session, ⌃⇥ next "needs you", ⌥⌘I inspector.
+- Keyboard first: ⌘N new session, ⌘T new task, ⌘1…⌘9 select session, ⌃⇥ next "needs you", ⌥⌘I inspector, ⇧⌘I import.
 - Terminal area stays dark in both appearances (TerminalTheme).

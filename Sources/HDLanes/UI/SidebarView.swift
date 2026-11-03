@@ -217,6 +217,7 @@ private struct ProjectHeader: View {
         .contextMenu {
             Button(L.newSession) { newSession() }
             Button(L.projectSettingsEllipsis) { actions.projectSettings(project.id) }
+            Button(L.importPastSessionsEllipsis) { model.importPreset = ImportPreset(tab: .sessions, search: project.path) }
             Button(L.revealInFinder) { Panels.reveal(project.path) }
             Divider()
             Button(L.removeProjectEllipsis) { actions.removeProject(project.id) }

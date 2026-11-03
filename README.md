@@ -29,6 +29,12 @@ log out of anything.
   `npm ci`) and gitignored files to copy in (for example `.env`).
 - **Several accounts at once.** Add as many Claude and Codex accounts as you like and pick one per session.
   See [How accounts work](#how-accounts-work).
+- **Import what you already have.** File › Import… (⇧⌘I) finds account folders you already use from the
+  terminal or an editor (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` in VS Code, Cursor or Windsurf settings and in
+  your shell profile, or `~/.claude-*` / `~/.codex-*` folders) and adds them without a new login. It also
+  lists your past Claude Code and Codex conversations (from the terminal, the VS Code extension or the
+  desktop apps), grouped by folder, so you can bring them into the sidebar and resume them there. See
+  [Importing](#importing).
 - **Answer permission prompts from the sidebar.** Claude's tool permission requests show up under the
   session with Allow and Deny. You can add a note when you deny.
 - **Subagents at a glance.** Running Claude subagents are listed under their session with the tool they
@@ -46,7 +52,7 @@ log out of anything.
   are guessed from English and Turkish keywords. If you turn it on, a single `claude -p` call on an account
   you pick can suggest one instead.
 - **Keyboard first.** ⌘N new session, ⌘T new task, ⌘1…⌘9 select a session, ⌃⇥ next session that needs
-  you, ⇧⌘B board, ⌥⌘I inspector.
+  you, ⇧⌘B board, ⌥⌘I inspector, ⇧⌘I import.
 - **English and Turkish** interface.
 
 ## How accounts work
@@ -86,8 +92,28 @@ Ways to sign in an account:
   Codex it is passed to `codex login --with-api-key` on stdin.
 
 hdlanes never reads or prints your existing credentials, and secrets are never written to its own state
-file. Removing an account moves its folder to the Trash. Your default `~/.claude` and `~/.codex` are never
+file. Removing an account hdlanes created moves its folder to the Trash. Removing an imported account only
+removes it from hdlanes; its folder stays where it is. Your default `~/.claude` and `~/.codex` are never
 removed.
+
+## Importing
+
+**Accounts.** If you already run `CLAUDE_CONFIG_DIR=~/.claude-work claude` (or set it in the Claude Code
+VS Code extension's environment variables, or use a second `CODEX_HOME`), Import › Accounts lists those
+folders and adds them as accounts that point at the folder in place. Nothing is copied or moved, and
+you don't sign in again. The folder path is kept exactly as you wrote it, because Claude Code's Keychain
+entry depends on the exact string (`~/.claude-2` and `~/.claude-2/` are two different logins). You can
+also pick a folder yourself. From shell profiles and editor settings hdlanes reads only these two
+variables and nothing else. The Claude desktop app keeps its own login, which can't be imported; add that
+account with a browser login instead.
+
+**Sessions.** Import › Sessions lists the conversations of every Claude and Codex account from the last
+7, 30 or 90 days, grouped by folder, with where each one was started (desktop app, VS Code, terminal).
+Imported sessions land in the sidebar under the project that holds their folder (a new project is added
+when none does). They aren't running; **Resume** continues the conversation (`claude --resume`,
+`codex resume`) in its folder with its account. Runs started with `claude -p` or `codex exec` are hidden
+unless you ask for them, and sessions whose folder no longer exists (usually a removed worktree) are
+left out. A project's context menu has **Import Past Sessions…**, filtered to that project.
 
 ## Requirements
 
