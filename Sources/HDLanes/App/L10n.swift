@@ -26,6 +26,13 @@ enum L {
         pick("The saved state could not be read. A copy was kept at \(backup); hdlanes started fresh.",
              "Kayıtlı durum okunamadı. Bir kopyası \(backup) konumunda saklandı; hdlanes boş başladı.")
     }
+    static func stateUnreadable(path: String, backupFailed: Bool, error: String) -> String {
+        backupFailed
+            ? pick("The saved state at \(path) could not be read, and a copy of it could not be kept (\(error)). hdlanes started empty and won't save anything, so the file stays as it is. Free up space or fix the folder's permissions, then restart hdlanes.",
+                   "\(path) konumundaki kayıtlı durum okunamadı ve bir kopyası saklanamadı (\(error)). hdlanes boş başladı ve hiçbir şey kaydetmeyecek; dosya olduğu gibi kalır. Yer açıp ya da klasörün izinlerini düzeltip hdlanes'i yeniden başlat.")
+            : pick("The saved state at \(path) exists but could not be read (\(error)). hdlanes started empty and won't save anything, so the file stays as it is. Fix its permissions, then restart hdlanes.",
+                   "\(path) konumundaki kayıtlı durum var ama okunamadı (\(error)). hdlanes boş başladı ve hiçbir şey kaydetmeyecek; dosya olduğu gibi kalır. İzinlerini düzeltip hdlanes'i yeniden başlat.")
+    }
     static var ok: String { pick("OK", "Tamam") }
     static var cancel: String { pick("Cancel", "Vazgeç") }
     static var done: String { pick("Done", "Bitti") }

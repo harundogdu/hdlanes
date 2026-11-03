@@ -57,6 +57,9 @@ final class AppModel {
     var alert: AppAlert?
     /// Set when state.json could not be read and was backed up; shown once as a banner.
     var loadWarning: String?
+    /// state.json exists but couldn't be read (or backed up): nothing is saved this run, so the file
+    /// is never replaced by the empty state. The banner stays up while this is set.
+    private(set) var persistenceBlocked = false
 
     // Sheets
     var isNewSessionSheetPresented = false
@@ -83,8 +86,14 @@ final class AppModel {
         self.store = StateStore(paths: paths)
         let result = store.load()
         self.state = result.state
-        if case .recoveredFromCorruption(_, let backup, _) = result {
+        switch result {
+        case .recoveredFromCorruption(_, let backup, _):
             loadWarning = L.stateRecovered(backup)
+        case .unreadable(_, let reason, let error):
+            persistenceBlocked = true
+            loadWarning = L.stateUnreadable(path: paths.stateFile.path, backupFailed: reason == .backupFailed, error: error)
+        case .fresh, .loaded:
+            break
         }
         terminals.model = self
     }
@@ -144,6 +153,7 @@ final class AppModel {
     // MARK: Persistence
 
     private func scheduleSave() {
+        guard !persistenceBlocked else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -153,6 +163,7 @@ final class AppModel {
     }
 
     func saveNow() {
+        guard !persistenceBlocked else { return }
         do {
             try store.save(state)
         } catch {

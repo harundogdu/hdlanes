@@ -39,6 +39,62 @@ struct StateStoreTests {
         #expect(try String(contentsOfFile: backup, encoding: .utf8) == "{not json")
     }
 
+    @Test func missingFileInExistingFolderStartsFresh() throws {
+        let paths = tempPaths()
+        try HDPaths.ensurePrivateDir(paths.root)
+        guard case .fresh = StateStore(paths: paths).load() else { Issue.record("expected fresh"); return }
+    }
+
+    /// A state file that exists but can't be read must not look like a first launch: the app would
+    /// save an empty state over it.
+    @Test(.enabled(if: geteuid() != 0, "root reads mode-000 files"))
+    func unreadableFileIsNotTreatedAsFresh() throws {
+        let paths = tempPaths()
+        let store = StateStore(paths: paths)
+        var state = AppState()
+        state.projects = [Project(name: "demo", path: "/tmp/demo")]
+        try store.save(state)
+        let original = try Data(contentsOf: paths.stateFile)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: paths.stateFile.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.stateFile.path) }
+
+        let result = store.load()
+        guard case .unreadable(let s, let reason, _) = result else { Issue.record("expected unreadable, got \(result)"); return }
+        #expect(reason == .readFailed)
+        #expect(s.projects.isEmpty)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.stateFile.path)
+        #expect(try Data(contentsOf: paths.stateFile) == original)
+        let names = try FileManager.default.contentsOfDirectory(atPath: paths.root.path)
+        #expect(names == ["state.json"])
+    }
+
+    @Test(.enabled(if: geteuid() != 0, "root ignores directory permissions"))
+    func unreadableFolderIsNotTreatedAsFresh() throws {
+        let paths = tempPaths()
+        try StateStore(paths: paths).save(AppState())
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: paths.root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: paths.root.path) }
+        let result = StateStore(paths: paths).load()
+        guard case .unreadable(_, .readFailed, _) = result else { Issue.record("expected unreadable, got \(result)"); return }
+    }
+
+    /// A corrupt file whose backup copy fails must not be reported as backed up.
+    @Test func failedBackupIsUnreadableNotRecovered() throws {
+        let paths = tempPaths()
+        try HDPaths.ensurePrivateDir(paths.root)
+        try Data("{not json".utf8).write(to: paths.stateFile)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "-")
+        let taken = paths.root.appendingPathComponent("state.backup-\(stamp).json")
+        try Data("older backup".utf8).write(to: taken)
+
+        let result = StateStore(paths: paths).load(now: now)
+        guard case .unreadable(_, .backupFailed, _) = result else { Issue.record("expected unreadable, got \(result)"); return }
+        #expect(try String(contentsOf: paths.stateFile, encoding: .utf8) == "{not json")
+        #expect(try String(contentsOf: taken, encoding: .utf8) == "older backup")
+    }
+
     @Test func olderFileWithMissingCollectionsLoads() throws {
         let paths = tempPaths()
         try HDPaths.ensurePrivateDir(paths.root)
