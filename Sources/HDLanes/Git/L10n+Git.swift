@@ -191,7 +191,6 @@ extension L {
         pick("Only http and https addresses can be opened.", "Yalnız http ve https adresleri açılabilir.")
     }
     static var detectedURLsHelp: String { pick("Seen in the terminal output", "Terminal çıktısında görüldü") }
-    static var dismiss: String { pick("Dismiss", "Kapat") }
 
     // MARK: Branch names
 

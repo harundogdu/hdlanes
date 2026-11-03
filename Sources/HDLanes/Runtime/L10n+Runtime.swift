@@ -71,5 +71,5 @@ extension L {
         case .auth: return pick("Needs you to log in again", "Yeniden giriş yapman gerekiyor")
         }
     }
-    static var notifyDone: String { pick("Finished", "Bitti") }
+    static var notifyDoneBody: String { pick("Finished", "Bitti") }
 }

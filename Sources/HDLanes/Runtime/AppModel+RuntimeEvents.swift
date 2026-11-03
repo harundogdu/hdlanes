@@ -318,7 +318,7 @@ extension AppModel {
         case .done:
             guard state.settings.notifyDone != false else { return }
             let last = runtime(for: id).snapshot.lastAssistantMessage.map { String(Self.displayText($0).prefix(200)) }
-            body = last.flatMap { $0.isEmpty ? nil : $0 } ?? L.notifyDone
+            body = last.flatMap { $0.isEmpty ? nil : $0 } ?? L.notifyDoneBody
             sound = false
         default:
             return
