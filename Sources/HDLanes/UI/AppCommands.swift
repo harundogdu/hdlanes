@@ -26,9 +26,9 @@ struct AppCommands: Commands {
                 .keyboardShortcut(.tab, modifiers: .control)
                 .disabled(!model.hasSessionNeedingUser)
             Divider()
-            Button(L.resume) { if let id = model.selectedSessionID { model.resumeSession(id) } }
+            Button(L.resume) { if let id = model.selectedSessionID { model.resumeFromUI(id) } }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(model.selectedSessionID.map { model.isSessionRunning($0) } ?? true)
+                .disabled(!(model.selectedSessionID.map { !model.isSessionRunning($0) || model.agentEndedInLiveShell($0) } ?? false))
             Button(L.stop) { if let id = model.selectedSessionID { model.stop(id) } }
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!(model.selectedSessionID.map { model.isSessionRunning($0) } ?? false))

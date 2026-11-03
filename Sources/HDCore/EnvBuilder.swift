@@ -81,8 +81,12 @@ public enum EnvBuilder {
     /// claude.ai / Console login and must not be rerouted to Bedrock, Vertex, Foundry or a proxy by the
     /// user's shell init. The system default account keeps them, so a `claude` the user deliberately
     /// runs on Bedrock from `.zshrc` behaves the same inside hdlanes.
+    /// Every switch claude 2.1.317 reads to pick a non-claude.ai provider (its provider selector checks
+    /// these six), plus the base URL that would send the account's token elsewhere.
     public static let claudeProviderSwitchVariables = [
-        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+        "CLAUDE_CODE_USE_ANTHROPIC_AWS", "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "CLAUDE_CODE_USE_MANTLE",
+        "ANTHROPIC_BASE_URL",
     ]
     public static let codexStripVariables = ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"]
 

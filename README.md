@@ -107,8 +107,9 @@ ad-hoc signing. Set `HDLANES_SIGN_IDENTITY=-` to force ad-hoc.
 
 During development you can also start it with `swift run hdlanes`.
 
-hdlanes keeps its data in `~/.hdlanes` (set `HDLANES_HOME` to use another folder). If `state.json` can't
-be read, hdlanes keeps a copy next to it before starting fresh.
+hdlanes keeps its data in `~/.hdlanes` (set `HDLANES_HOME` to use another folder). If `state.json` doesn't
+decode, hdlanes keeps a copy next to it before starting fresh. If it can't be read at all, hdlanes leaves it
+alone, shows a banner and doesn't save until the problem is fixed.
 
 ## Acknowledgements
 

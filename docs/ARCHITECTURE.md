@@ -18,8 +18,10 @@ Everything runs locally. The research behind the decisions is in `docs/research/
    - Codex: `CODEX_HOME=<dir>` (must exist). `auth.json`, sessions, sqlite are under it. System default
      account is launched without `CODEX_HOME`.
    - Verified on this machine with claude 2.1.317 / codex 0.166.0: an empty dir → logged out; default → logged in.
-3. **Never lose user data.** state.json is written atomically; an unreadable file is copied aside, not
-   overwritten silently. Removing a worktree/account dir asks first and says what will be lost.
+3. **Never lose user data.** state.json is written atomically. A file that doesn't decode is copied aside
+   before hdlanes starts fresh; a file that can't be read (or backed up) is left untouched and saving is
+   blocked until the user fixes it. Removing a worktree/account dir asks first and says what will be lost;
+   commits only reachable from a detached HEAD go to a rescue branch first.
 4. **No hardcoded UI text in views.** All strings go through `L` (`App/L10n.swift` + per-area
    `L10n+<Area>.swift`), English + Turkish side by side: `static var x: String { pick("en", "tr") }`.
 5. **Small files, protocol-first where a seam is useful.** Pure logic lives in `HDCore` with tests.
@@ -40,7 +42,7 @@ SwiftTerm (keep terminal code in AppKit-only files), or qualify `SwiftUI.Color`.
 
 ```
 state.json                         AppState (accounts, projects, sessions, tasks, usage, settings)
-state.backup-<ts>.json             unreadable state preserved
+state.backup-<ts>.json             state.json that failed to decode, preserved
 accounts/claude/<uuid>/            CLAUDE_CONFIG_DIR of a managed Claude account (0700)
 accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700)
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json

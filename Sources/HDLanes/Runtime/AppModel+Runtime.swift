@@ -201,6 +201,9 @@ extension AppModel {
         resetLiveState(sessionID, agentSessionID: agentSessionID)
         if shellAlive {
             // The agent exited and left its shell: start it there.
+            // Ctrl-U first: whatever the user left half-typed at the prompt must not be glued in front
+            // of the agent command and run with it.
+            terminals.sendRaw(sessionID, "\u{15}")
             terminals.paste(sessionID, EnvBuilder.agentCommand(agentLaunch), submit: true)
             rt.startedAt = Date()
         } else {

@@ -549,16 +549,6 @@ extension L {
 
     // Integration
     static var copyFilesFailedTitle: String { pick("Some files weren't copied into the worktree", "Bazı dosyalar worktree'ye kopyalanamadı") }
-    static func worktreeDirtyConfirmTitle(_ n: Int) -> String {
-        pick(n == 1 ? "The worktree has 1 uncommitted change" : "The worktree has \(n) uncommitted changes",
-             "Worktree'de commit edilmemiş \(n) değişiklik var")
-    }
-    static func worktreeDirtyConfirmBody(path: String, sample: [String]) -> String {
-        let list = sample.prefix(6).joined(separator: "\n")
-        return pick("Removing \(path) deletes these changes for good. The branch and its commits stay.\n\n\(list)",
-                    "\(path) kaldırılırsa bu değişiklikler kalıcı olarak silinir. Dal ve commit'leri kalır.\n\n\(list)")
-    }
-    static var worktreeDirtyConfirmRemove: String { pick("Remove Anyway", "Yine de Kaldır") }
 
     // Agent exited in its shell
     static var agentExitedShellOpen: String { pick("The agent exited; its shell is still open", "Ajan çıktı; kabuğu hâlâ açık") }

@@ -94,7 +94,9 @@ struct EnvBuilderTests {
     }
 
     @Test func providerSwitchesAreUnsetForManagedClaudeAccountsOnly() {
-        let switches = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL"]
+        let switches = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+                        "CLAUDE_CODE_USE_ANTHROPIC_AWS", "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "CLAUDE_CODE_USE_MANTLE",
+                        "ANTHROPIC_BASE_URL"]
         #expect(EnvBuilder.claudeProviderSwitchVariables == switches)
         let managed = EnvBuilder.agentCommand(.init(provider: .claude, account: managedClaude, title: "",
                                                     agentSessionID: nil, resume: false))
