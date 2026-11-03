@@ -72,9 +72,17 @@ public enum EnvBuilder {
     // MARK: Agent command
 
     /// Unset before `claude` so a token exported by the user's shell init can't win over the account.
+    /// The single source of strip lists: `AccountCLI` uses these too.
     public static let claudeStripVariables = [
         "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDECODE",
         "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_DISABLE_TERMINAL_TITLE", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
+    ]
+    /// Provider routing switches. Unset for managed accounts only: a managed account is its own
+    /// claude.ai / Console login and must not be rerouted to Bedrock, Vertex, Foundry or a proxy by the
+    /// user's shell init. The system default account keeps them, so a `claude` the user deliberately
+    /// runs on Bedrock from `.zshrc` behaves the same inside hdlanes.
+    public static let claudeProviderSwitchVariables = [
+        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL",
     ]
     public static let codexStripVariables = ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"]
 
@@ -86,10 +94,18 @@ public enum EnvBuilder {
         }
     }
 
+    /// `stripVariables(for:)`, plus the provider switches for a managed account.
+    public static func stripVariables(for provider: Provider, managedAccount: Bool) -> [String] {
+        var names = stripVariables(for: provider)
+        if provider == .claude, managedAccount { names += claudeProviderSwitchVariables }
+        return names
+    }
+
     /// `env -u … [CLAUDE_CONFIG_DIR='<dir>']`: the prefix in front of every vendor CLI invocation.
     public static func envPrefix(provider: Provider, account: Account?) -> String {
         var parts = ["env"]
-        for name in stripVariables(for: provider) { parts.append("-u \(name)") }
+        let managed = !accountVariables(account).isEmpty
+        for name in stripVariables(for: provider, managedAccount: managed) { parts.append("-u \(name)") }
         for (key, value) in accountVariables(account).sorted(by: { $0.key < $1.key }) {
             parts.append("\(key)=\(ShellQuote.quote(value))")
         }
@@ -200,10 +216,15 @@ public enum EnvBuilder {
 
     /// The session terminal: the user's login shell runs the agent, then stays as an interactive shell.
     /// A `.shell` provider gets a plain login shell.
+    ///
+    /// The terminal itself carries the managed account's dir variable, so a `claude` / `codex` typed in
+    /// the shell left after the agent exits runs as the same account. The agent prefix still unsets and
+    /// sets it again. Empty for the system default account (see `accountVariables`).
     public static func launchSpec(_ launch: AgentLaunch, session: SessionVariables, cwd: String,
                                   processEnv: [String: String]) -> LaunchSpec {
         guard launch.provider.isAgent else { return shellSpec(cwd: cwd, processEnv: processEnv) }
         var env = baseEnvironment(processEnv)
+        for (key, value) in accountVariables(launch.account) { env[key] = value }
         for (key, value) in session.environment { env[key] = value }
         let script = agentCommand(launch) + "; " + keepShell(processEnv)
         return LaunchSpec(executable: commandShell(processEnv), args: ["-l", "-i", "-c", script],
@@ -253,12 +274,15 @@ public enum EnvBuilder {
     }
 
     /// Runs the login command, prints `doneNotice` when it ends and stays a shell so errors stay visible.
+    /// Like a session terminal, the remaining shell carries the managed account's dir variable.
     public static func loginSpec(provider: Provider, flow: LoginFlow, account: Account?, doneNotice: String,
                                  cwd: String, processEnv: [String: String]) -> LaunchSpec? {
         guard let command = loginCommand(provider: provider, flow: flow, account: account) else { return nil }
         let script = "\(command); printf '\\n%s\\n' \(ShellQuote.quote(doneNotice)); " + keepShell(processEnv)
+        var env = baseEnvironment(processEnv)
+        for (key, value) in accountVariables(account) { env[key] = value }
         return LaunchSpec(executable: commandShell(processEnv), args: ["-l", "-i", "-c", script],
-                          environment: baseEnvironment(processEnv), cwd: cwd)
+                          environment: env, cwd: cwd)
     }
 }
 

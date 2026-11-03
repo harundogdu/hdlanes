@@ -93,6 +93,43 @@ struct EnvBuilderTests {
         #expect(codex.hasSuffix("CODEX_HOME='/Users/u/.hdlanes/accounts/codex/X' codex"))
     }
 
+    @Test func providerSwitchesAreUnsetForManagedClaudeAccountsOnly() {
+        let switches = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL"]
+        #expect(EnvBuilder.claudeProviderSwitchVariables == switches)
+        let managed = EnvBuilder.agentCommand(.init(provider: .claude, account: managedClaude, title: "",
+                                                    agentSessionID: nil, resume: false))
+        // The system default account keeps the user's own provider setup (e.g. Bedrock from .zshrc).
+        let system = EnvBuilder.agentCommand(.init(provider: .claude, account: systemClaude, title: "",
+                                                   agentSessionID: nil, resume: false))
+        let codex = EnvBuilder.agentCommand(.init(provider: .codex, account: managedCodex, title: "",
+                                                  agentSessionID: nil, resume: false))
+        let login = EnvBuilder.loginCommand(provider: .claude, flow: .browser, account: managedClaude) ?? ""
+        for name in switches {
+            #expect(managed.contains("-u \(name) "), "\(name)")
+            #expect(login.contains("-u \(name) "), "\(name)")
+            #expect(!system.contains("-u \(name) "), "\(name)")
+            #expect(!codex.contains("-u \(name) "), "\(name)")
+        }
+    }
+
+    @Test func managedSessionIgnoresProviderSwitchesFromShellInit() throws {
+        let dir = try tempDir()
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        let script = "#!/bin/sh\nprintf 'bedrock=%s vertex=%s foundry=%s base=%s' \"$CLAUDE_CODE_USE_BEDROCK\" \"$CLAUDE_CODE_USE_VERTEX\" \"$CLAUDE_CODE_USE_FOUNDRY\" \"$ANTHROPIC_BASE_URL\"\n"
+        let fake = dir.appendingPathComponent("bin/claude")
+        try script.write(to: fake, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        // What a `.zshrc` exporting the switches leaves in the agent's shell.
+        let env = ["PATH": "\(dir.path)/bin:/usr/bin:/bin", "CLAUDE_CODE_USE_BEDROCK": "1", "CLAUDE_CODE_USE_VERTEX": "1",
+                   "CLAUDE_CODE_USE_FOUNDRY": "1", "ANTHROPIC_BASE_URL": "https://proxy.invalid"]
+        let managed = try sh(EnvBuilder.agentInvocation(.init(provider: .claude, account: managedClaude, title: "",
+                                                              agentSessionID: nil, resume: false)), env: env)
+        #expect(managed == "bedrock= vertex= foundry= base=")
+        let system = try sh(EnvBuilder.agentInvocation(.init(provider: .claude, account: systemClaude, title: "",
+                                                             agentSessionID: nil, resume: false)), env: env)
+        #expect(system == "bedrock=1 vertex=1 foundry=1 base=https://proxy.invalid")
+    }
+
     // MARK: Command line
 
     @Test func claudeNewSessionCommand() {
@@ -255,8 +292,34 @@ struct EnvBuilderTests {
                                                      doneNotice: "Login finished.", cwd: "/Users/u", processEnv: processEnv))
         #expect(spec.args.prefix(3) == ["-l", "-i", "-c"])
         #expect(spec.args[3].contains("claude auth login --claudeai; printf '\\n%s\\n' 'Login finished.'; exec '/bin/zsh' -l -i"))
-        #expect(spec.environment["CLAUDE_CONFIG_DIR"] == nil)
+        // The shell left after the login command is the account's too.
+        #expect(spec.environment["CLAUDE_CONFIG_DIR"] == managedDir)
+        #expect(spec.environment["ANTHROPIC_API_KEY"] == nil)
         #expect(spec.environment["HD_SESSION_ID"] == nil)
+        let system = try #require(EnvBuilder.loginSpec(provider: .claude, flow: .token, account: systemClaude,
+                                                       doneNotice: "x", cwd: "/", processEnv: processEnv))
+        #expect(system.environment["CLAUDE_CONFIG_DIR"] == nil)
+    }
+
+    @Test func shellLeftAfterTheAgentKeepsTheManagedAccount() throws {
+        let launch = EnvBuilder.AgentLaunch(provider: .claude, account: managedClaude, title: "t", agentSessionID: nil, resume: false)
+        let spec = EnvBuilder.launchSpec(launch, session: .init(socketPath: "/s", sessionID: UUID(), accountID: managedClaude.id),
+                                         cwd: "/repo", processEnv: processEnv)
+        #expect(spec.environment["CLAUDE_CONFIG_DIR"] == managedDir)
+        #expect(spec.environment["CODEX_HOME"] == nil)
+        let codex = EnvBuilder.launchSpec(.init(provider: .codex, account: managedCodex, title: "t", agentSessionID: nil, resume: false),
+                                          session: .init(socketPath: "/s", sessionID: UUID(), accountID: managedCodex.id),
+                                          cwd: "/repo", processEnv: processEnv)
+        #expect(codex.environment["CODEX_HOME"] == "/Users/u/.hdlanes/accounts/codex/X")
+        #expect(codex.environment["CLAUDE_CONFIG_DIR"] == nil)
+
+        // Run the trailing part as the terminal would: a `claude` typed there sees the account's dir.
+        let dir = try tempDir()
+        try fakeAgent(named: "claude", in: dir)
+        var env = spec.environment
+        env["PATH"] = "\(dir.path):/usr/bin:/bin"
+        let out = try sh("claude", env: env)
+        #expect(out.hasPrefix("dir=\(managedDir) "))
     }
 
     @Test func cliEnvironmentUsesLoginPath() {

@@ -46,6 +46,7 @@ accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700)
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json
 run/hd.sock                        hook socket (run/ is 0700)
 run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline)
+run/cli/                           empty cwd of account CLI calls and the login terminal
 ```
 
 Worktrees default to `<repo parent>/<repo name>-worktrees/<slug>` (per-project override `worktreeRoot`).
@@ -65,7 +66,8 @@ init can't override the account's login, then the account's dir variable (manage
 ```
 env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDECODE \
     -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_DISABLE_TERMINAL_TITLE -u CLAUDE_CONFIG_DIR -u CODEX_HOME \
-    [CLAUDE_CONFIG_DIR='<dir>'] \
+    [-u CLAUDE_CODE_USE_BEDROCK -u CLAUDE_CODE_USE_VERTEX -u CLAUDE_CODE_USE_FOUNDRY -u ANTHROPIC_BASE_URL \
+     CLAUDE_CONFIG_DIR='<dir>'] \
   claude --plugin-dir '<~/.hdlanes/plugin/claude>' --settings '<run/sessions/<id>/settings.json>' \
          --session-id <uuid> -n '<title>' ['<initial prompt>']
 resume:  claude … --resume <uuid>
@@ -73,10 +75,26 @@ codex:   env -u OPENAI_API_KEY -u CODEX_API_KEY -u CODEX_ACCESS_TOKEN -u CODEX_H
 resume:  codex resume <thread-id>
 ```
 
+The bracketed part is for managed accounts only. **Provider switches** (`CLAUDE_CODE_USE_BEDROCK`,
+`CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_BASE_URL`) beat a claude.ai login, so a
+`.zshrc` export would silently reroute a managed account to Bedrock/Vertex/a proxy: they are unset for
+managed accounts. The system default account keeps them on purpose: it is "the user's own `claude`",
+and someone whose plain `claude` runs on Bedrock from `.zshrc` gets the same inside hdlanes.
+`EnvBuilder.claudeStripVariables` / `claudeProviderSwitchVariables` / `codexStripVariables` are the one
+source of these lists; `AccountCLI` (status checks, key login) builds its `env -u` line from them.
+
 The PTY's own environment is an allowlist built from the app's environment: `HOME USER LOGNAME SHELL
 LANG LC_* TMPDIR PATH` + `TERM=xterm-256color COLORTERM=truecolor TERM_PROGRAM=hdlanes` + hdlanes vars
 `HD_SOCKET HD_SESSION_ID HD_ACCOUNT_ID [HD_STATUSLINE_CHAIN]`. Anything `CLAUDE*`, `ANTHROPIC_*`,
-`CODEX_*`, `OPENAI_*`, `TMUX*` from the app's own environment is dropped.
+`CODEX_*`, `OPENAI_*`, `TMUX*` from the app's own environment is dropped. A managed account's dir
+variable (`CLAUDE_CONFIG_DIR` / `CODEX_HOME`) is then set on the PTY itself (session and login
+terminals), so a `claude` / `codex` typed in the shell left after the agent runs as the same account.
+Known leftover: shell init that exports these variables or credentials still wins in that shell.
+
+Vendor CLI calls for an account (`auth status`, `login status`, `claude -p`, key login) and the login
+terminal run with cwd `run/cli/` (empty, hdlanes-owned), never `$HOME`: Claude Code reads
+`<cwd>/.claude/settings.json` as project settings, and from `$HOME` that is the system default account's
+own file (an `apiKeyHelper` there made every managed account look logged in with an API key).
 
 Shell quoting: single-quote every interpolated value (`'` → `'\''`).
 

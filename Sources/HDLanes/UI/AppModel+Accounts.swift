@@ -148,7 +148,21 @@ extension AppModel {
         let path = await ShellPath.resolved(base: environment(for: nil))
         let env = AccountCLI.environment(base: environment(for: account), provider: account.provider, configDir: dir, path: path)
         let line = AccountCLI.commandLine(provider: account.provider, configDir: dir, arguments: arguments)
-        return await CLIRunner.runShell(line, environment: env, currentDirectory: NSHomeDirectory(), stdin: stdin, timeout: timeout)
+        return await CLIRunner.runShell(line, environment: env, currentDirectory: accountCLIDirectory(), stdin: stdin, timeout: timeout)
+    }
+
+    /// Working directory of vendor CLI calls and the login terminal: an empty folder hdlanes owns.
+    /// Claude Code reads `<cwd>/.claude/settings.json` as project settings, so from `$HOME` the system
+    /// default account's own settings (an `apiKeyHelper`, hooks) would apply to every managed account.
+    func accountCLIDirectory() -> String {
+        let url = paths.runDir.appendingPathComponent("cli", isDirectory: true)
+        do {
+            try HDPaths.ensurePrivateDir(url)
+            return url.path
+        } catch {
+            // A missing cwd would make the launch fail and read as "CLI not installed".
+            return NSTemporaryDirectory()
+        }
     }
 
     // MARK: Saving a token or key (managed accounts only)

@@ -40,8 +40,57 @@ struct AccountCLITests {
         #expect(line.contains("-u CODEX_HOME"))
         #expect(line.hasSuffix("CLAUDE_CONFIG_DIR='/a b/c' claude 'auth' 'status' '--json'"))
         let codex = AccountCLI.commandLine(provider: .codex, configDir: nil, arguments: ["login", "status"])
-        #expect(codex.hasSuffix("-u CODEX_HOME codex 'login' 'status'"))
+        #expect(codex.contains("-u CODEX_HOME "))
+        #expect(codex.contains("-u CODEX_ACCESS_TOKEN "))
+        #expect(codex.hasSuffix(" codex 'login' 'status'"))
         #expect(!codex.contains("CODEX_HOME='"))
+    }
+
+    @Test func stripListComesFromEnvBuilder() {
+        for name in EnvBuilder.claudeStripVariables + EnvBuilder.codexStripVariables {
+            #expect(AccountCLI.strippedVariables.contains(name), "\(name)")
+        }
+        #expect(Set(AccountCLI.strippedVariables).count == AccountCLI.strippedVariables.count)
+        // Before the shared list, AccountCLI lacked this one.
+        let system = AccountCLI.commandLine(provider: .claude, configDir: nil, arguments: ["auth", "status"])
+        #expect(system.contains("-u CLAUDE_CODE_DISABLE_TERMINAL_TITLE "))
+    }
+
+    @Test func providerSwitchesAreUnsetForManagedClaudeAccountsOnly() {
+        let managed = AccountCLI.commandLine(provider: .claude, configDir: "/h/claude/A", arguments: ["auth", "status"])
+        let system = AccountCLI.commandLine(provider: .claude, configDir: nil, arguments: ["auth", "status"])
+        let codex = AccountCLI.commandLine(provider: .codex, configDir: "/h/codex/B", arguments: ["login", "status"])
+        for name in ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL"] {
+            #expect(managed.contains("-u \(name) "), "\(name)")
+            #expect(!system.contains("-u \(name) "), "\(name)")
+            #expect(!codex.contains("-u \(name) "), "\(name)")
+        }
+    }
+
+    @Test func managedClaudeStatusIgnoresABedrockSwitchFromTheShell() throws {
+        // A stand-in `claude` that reports which provider it would use.
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hdlanes-acli-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let script = "#!/bin/sh\nprintf 'bedrock=%s vertex=%s base=%s' \"$CLAUDE_CODE_USE_BEDROCK\" \"$CLAUDE_CODE_USE_VERTEX\" \"$ANTHROPIC_BASE_URL\"\n"
+        let fake = dir.appendingPathComponent("claude")
+        try script.write(to: fake, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        func run(_ configDir: String?) throws -> String {
+            let line = AccountCLI.commandLine(provider: .claude, configDir: configDir, arguments: ["auth", "status"])
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", line]
+            p.environment = ["PATH": "\(dir.path):/usr/bin:/bin", "CLAUDE_CODE_USE_BEDROCK": "1",
+                             "CLAUDE_CODE_USE_VERTEX": "1", "ANTHROPIC_BASE_URL": "https://proxy.invalid"]
+            let out = Pipe()
+            p.standardOutput = out
+            try p.run()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return String(decoding: data, as: UTF8.self)
+        }
+        #expect(try run("/h/claude/A") == "bedrock= vertex= base=")
+        #expect(try run(nil) == "bedrock=1 vertex=1 base=https://proxy.invalid")
     }
 
     @Test func commandNotFound() {
