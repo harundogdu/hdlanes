@@ -559,4 +559,12 @@ extension L {
                     "\(path) kaldırılırsa bu değişiklikler kalıcı olarak silinir. Dal ve commit'leri kalır.\n\n\(list)")
     }
     static var worktreeDirtyConfirmRemove: String { pick("Remove Anyway", "Yine de Kaldır") }
+
+    // Agent exited in its shell
+    static var agentExitedShellOpen: String { pick("The agent exited; its shell is still open", "Ajan çıktı; kabuğu hâlâ açık") }
+    static var resumeShellBusyTitle: String { pick("Couldn't resume the agent", "Ajan sürdürülemedi") }
+    static var resumeShellBusyBody: String {
+        pick("Another program is running in this terminal. Quit it, then try again, or stop the session and resume it.",
+             "Bu terminalde başka bir program çalışıyor. Onu kapatıp yeniden dene ya da oturumu durdurup sürdür.")
+    }
 }
