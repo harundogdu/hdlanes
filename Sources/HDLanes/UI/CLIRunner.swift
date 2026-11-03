@@ -99,8 +99,12 @@ enum CLIRunner {
         }
 
         if let inPipe, let stdin {
-            inPipe.fileHandleForWriting.write(stdin)
-            try? inPipe.fileHandleForWriting.close()
+            let writer = inPipe.fileHandleForWriting
+            // If the child exits without reading (e.g. the CLI isn't installed), report EPIPE instead
+            // of raising SIGPIPE, which would kill the app. Per-fd, so terminal children keep the default.
+            _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
+            try? writer.write(contentsOf: stdin)
+            try? writer.close()
         }
 
         let pid = process.processIdentifier
