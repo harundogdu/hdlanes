@@ -102,9 +102,10 @@ extension AppModel {
         return WorktreeResult(path: path, branch: name, baseRef: base, copyFailures: failures)
     }
 
-    /// Removes the session's worktree (refuses when dirty unless `force`).
-    /// Throws `GitError.worktreeDirty` when there are uncommitted or untracked files; the branch and its
-    /// commits are never deleted.
+    /// Removes the session's worktree. Without `force` it refuses with `GitError.worktreeDirty` when
+    /// uncommitted, untracked or gitignored files (other than build output and unchanged copies) would be
+    /// deleted, or a rebase/merge is unfinished. Either way, commits that only a detached HEAD holds are
+    /// first saved to a new `hd/rescued-…` branch and the user is told its name. Branches are never deleted.
     func removeWorktree(sessionID: UUID, force: Bool) async throws {
         guard let session = session(sessionID) else { throw GitError.sessionNotFound }
         guard let worktree = session.worktreePath else { return }
@@ -116,11 +117,17 @@ extension AppModel {
             updateSession(sessionID) { $0.worktreePath = nil }
             return
         }
-        if !force {
-            let changes = try await GitService.status(worktree)
-            if !changes.isEmpty {
-                throw GitError.worktreeDirty(path: worktree, count: changes.count, sample: changes.prefix(3).map(\.path))
-            }
+        var risks: WorktreeRemovalRisks
+        if force {
+            risks = WorktreeRemovalRisks()
+            try await addDetachedCommits(to: &risks, worktree: worktree, sessionBranch: session.branch)
+        } else {
+            risks = try await worktreeRemovalRisks(sessionID: sessionID) ?? WorktreeRemovalRisks()
+            if risks.needsConfirmation { throw GitError.worktreeDirty(path: worktree, risks: risks) }
+        }
+        // The worktree's own HEAD reflog goes with the folder, so detached commits need a branch first.
+        if let branch = risks.rescueBranch, let head = risks.head {
+            try await GitService.createBranch(branch, at: head, in: worktree)
         }
         var runFrom = worktree
         if let mainCheckout, fm.fileExists(atPath: mainCheckout) {
@@ -131,6 +138,43 @@ extension AppModel {
         try await GitService.worktreeRemove(repo: runFrom, path: worktree, force: force)
         updateSession(sessionID) { $0.worktreePath = nil }
         diffs[sessionID] = nil
+        if let branch = risks.rescueBranch {
+            alert = AppAlert(title: L.worktreeRescuedTitle,
+                             message: L.worktreeRescuedMessage(branch: branch, count: risks.unreachableCommits))
+        }
+    }
+
+    /// What removing the session's worktree would delete. nil when it has no worktree folder.
+    /// Throws when git can't answer; callers must not remove the folder then.
+    func worktreeRemovalRisks(sessionID: UUID) async throws -> WorktreeRemovalRisks? {
+        guard let session = session(sessionID) else { throw GitError.sessionNotFound }
+        guard let worktree = session.worktreePath, FileManager.default.fileExists(atPath: worktree) else { return nil }
+        let entries = try await GitService.statusIncludingIgnored(worktree)
+        let split = WorktreeRemovalRisks.split(entries)
+        var ignored = WorktreePlanner.ignoredWorthKeeping(split.ignored)
+        if !ignored.isEmpty, let main = await GitService.mainWorktree(of: worktree) {
+            // Copies of the main checkout's files (`copyFiles`) that nobody changed lose nothing.
+            let unchanged = await GitService.unchangedCopies(ignored, worktree: worktree, original: main)
+            ignored.removeAll { unchanged.contains($0) }
+        }
+        var risks = WorktreeRemovalRisks(uncommitted: split.uncommitted, ignored: ignored,
+                                         operations: try await GitService.operationsInProgress(worktree))
+        try await addDetachedCommits(to: &risks, worktree: worktree, sessionBranch: session.branch)
+        return risks
+    }
+
+    /// Fills in the commits only a detached HEAD holds, and the branch they will be saved to.
+    private func addDetachedCommits(to risks: inout WorktreeRemovalRisks, worktree: String, sessionBranch: String?) async throws {
+        guard await GitService.currentBranch(worktree) == nil else { return }
+        // Both throw: guessing "nothing to save" here would let the removal delete the commits.
+        let count = try await GitService.unreachableCommitCount(worktree)
+        guard count > 0 else { return }
+        let head = try await GitService.git(["rev-parse", "--verify", "HEAD^{commit}"], in: worktree).trimmedOut
+        risks.unreachableCommits = count
+        risks.head = head
+        risks.rescueBranch = WorktreePlanner.rescueBranch(
+            sessionBranch: sessionBranch, worktreeName: (worktree as NSString).lastPathComponent, head: head,
+            existing: await GitService.branches(worktree))
     }
 
     func refreshDiff(_ sessionID: UUID) async {
@@ -156,6 +200,9 @@ extension AppModel {
             } catch {
                 result = .failure(error)
             }
+            // A cancelled run's git calls were killed: its result says nothing. Keep the last one.
+            if Task.isCancelled { break }
+            if case .failure(let error) = result, error is CancellationError { break }
             guard var d = diffs[sessionID] else { return }
             switch result {
             case .success(let snapshot?):
@@ -165,6 +212,11 @@ extension AppModel {
                 d.isTruncated = snapshot.truncated
                 d.isRepository = true
                 d.error = nil
+                // The agent may have switched branches; the sidebar and the PR use the live one.
+                if let branch = snapshot.branch, branch != session.branch {
+                    updateSession(sessionID) { $0.branch = branch }
+                }
+                relocateReviewNotes(sessionID, in: snapshot.files)
             case .success(nil):
                 d.files = []
                 d.baseDescription = ""
@@ -177,8 +229,32 @@ extension AppModel {
             d.hasLoaded = true
             d.updatedAt = Date()
             diffs[sessionID] = d
-        } while diffs[sessionID]?.refreshQueued == true
+        } while diffs[sessionID]?.refreshQueued == true && !Task.isCancelled
         diffs[sessionID]?.isRefreshing = false
+        if diffs[sessionID]?.refreshQueued == true {
+            // Only reached when this task was cancelled: run the queued pass in a task of its own.
+            diffs[sessionID]?.refreshQueued = false
+            Task { await self.refreshDiff(sessionID) }
+        }
+    }
+
+    /// Moves notes to the line that now shows their text, so the message carries current line numbers
+    /// after the agent inserted or deleted lines above them.
+    private func relocateReviewNotes(_ sessionID: UUID, in files: [DiffFile]) {
+        guard var notes = reviewNotes[sessionID], !notes.isEmpty else { return }
+        var changed = false
+        for i in notes.indices {
+            guard let file = files.first(where: { $0.path == notes[i].filePath }),
+                  let row = DiffLineLocator.locateNote(newLine: notes[i].line, oldLine: notes[i].oldLine,
+                                                       text: notes[i].lineText, in: file.lines) else { continue }
+            let newLine = row.kind == .removed ? nil : row.newLine
+            if notes[i].line != newLine || notes[i].oldLine != row.oldLine {
+                notes[i].line = newLine
+                notes[i].oldLine = row.oldLine
+                changed = true
+            }
+        }
+        if changed { reviewNotes[sessionID] = notes }
     }
 
     func addReviewNote(_ note: ReviewNote, to sessionID: UUID) {
@@ -190,9 +266,12 @@ extension AppModel {
         if reviewNotes[sessionID]?.isEmpty == true { reviewNotes[sessionID] = nil }
     }
 
-    /// Pastes all notes of the session into its agent as one message and clears them.
+    /// Pastes all notes of the session into its agent as one message and clears them. Does nothing (and
+    /// keeps the notes) when `reviewNotesSendProblem` says the terminal can't take them now.
     func sendReviewNotes(_ sessionID: UUID) {
         guard let notes = reviewNotes[sessionID], !notes.isEmpty else { return }
+        // Checked again here: the status the button was drawn with can be stale.
+        guard reviewNotesSendProblem(sessionID) == nil else { return }
         let text = Self.reviewMessage(for: notes)
         sendText(text, to: sessionID, submit: true)
         reviewNotes[sessionID] = nil
@@ -232,6 +311,15 @@ extension AppModel {
 
     func isGitHubCLIAvailable() async -> Bool { await GitService.ghAvailable() }
 
+    /// Why the session's review notes can't be sent now (localized); nil when they can. Text is only
+    /// pasted while the agent itself owns the terminal and isn't showing a prompt that Return would answer.
+    func reviewNotesSendProblem(_ sessionID: UUID) -> String? {
+        if reviewNotes[sessionID]?.isEmpty != false { return L.sendNotesNoNotes }
+        guard let session = session(sessionID), session.provider.isAgent else { return L.sendNotesNoAgent }
+        guard let runtime = runtimes[sessionID], runtime.isProcessRunning else { return L.sendNotesNotRunning }
+        return ReviewSendBlock.check(status: runtime.status, foregroundIsShell: foregroundIsShell(sessionID)).map(L.describe)
+    }
+
     func pullRequestInfo(sessionID: UUID) async -> PullRequestInfo {
         var info = PullRequestInfo()
         guard let session = session(sessionID) else {
@@ -243,9 +331,13 @@ extension AppModel {
             info.problem = .notRepository
             return info
         }
-        let head: String?
-        if let branch = session.branch { head = branch } else { head = await GitService.currentBranch(info.directory) }
+        // Always the branch checked out now: the agent may have switched since the session started.
+        // Detached HEAD → no branch to push, never the stored name.
+        let head = await GitService.currentBranch(info.directory)
         info.head = head
+        if let head, head != session.branch {
+            updateSession(sessionID) { $0.branch = head }
+        }
         if let fromRef = GitRefs.pullRequestBase(fromBaseRef: session.baseRef) {
             info.base = fromRef
         } else {

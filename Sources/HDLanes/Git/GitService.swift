@@ -25,8 +25,9 @@ enum GitError: LocalizedError, Equatable {
     case invalidBranch(String, BranchNameProblem)
     case invalidBaseRef(String)
     case branchInUse(branch: String, path: String)
-    /// Uncommitted or untracked files would be lost. `sample` holds a few of the paths.
-    case worktreeDirty(path: String, count: Int, sample: [String])
+    /// Removing the worktree would lose uncommitted, untracked or ignored files, or an unfinished
+    /// rebase/merge. Detached commits are listed too; they are saved to `risks.rescueBranch` first.
+    case worktreeDirty(path: String, risks: WorktreeRemovalRisks)
     case sessionNotFound
     case noBranch
     case sameAsBase(String)
@@ -350,6 +351,69 @@ enum GitService {
         return GitOutput.statusEntries(r.out)
     }
 
+    /// `status` plus gitignored entries (`!!`, folders end in `/`), which `git worktree remove` deletes
+    /// even without --force.
+    static func statusIncludingIgnored(_ dir: String) async throws -> [GitOutput.StatusEntry] {
+        let r = try await git(["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignored=matching"],
+                              in: dir, timeout: 60)
+        return GitOutput.statusEntries(r.out)
+    }
+
+    /// Commits reachable from HEAD but from no branch, tag or remote (0 when HEAD is on a branch).
+    /// Throws when git can't tell, so a caller about to delete the worktree stops instead of guessing 0.
+    static func unreachableCommitCount(_ dir: String) async throws -> Int {
+        let r = try await git(["rev-list", "--count", "HEAD", "--not", "--branches", "--tags", "--remotes"], in: dir)
+        guard let n = Int(r.trimmedOut) else {
+            throw GitError.failed(command: "git rev-list", status: r.status, stderr: r.err)
+        }
+        return n
+    }
+
+    /// Rebase, merge, cherry-pick, revert or bisect left unfinished in the worktree at `dir`.
+    static func operationsInProgress(_ dir: String) async throws -> [GitOperation] {
+        let gitDir = try await git(["rev-parse", "--absolute-git-dir"], in: dir).trimmedOut
+        let fm = FileManager.default
+        let present = GitOperation.markers.map(\.name).filter {
+            fm.fileExists(atPath: (gitDir as NSString).appendingPathComponent($0))
+        }
+        return GitOperation.inProgress(existing: Set(present))
+    }
+
+    /// Of the ignored `paths` in `worktree`, the files that are byte-identical to the same path in
+    /// `original` (the main checkout), so deleting them loses nothing. Folders are never counted.
+    static func unchangedCopies(_ paths: [String], worktree: String, original: String) async -> Set<String> {
+        let fm = FileManager.default
+        var same = Set<String>()
+        for rel in paths.prefix(200) where !rel.hasSuffix("/") {
+            let a = (worktree as NSString).appendingPathComponent(rel)
+            let b = (original as NSString).appendingPathComponent(rel)
+            guard let sa = (try? fm.attributesOfItem(atPath: a))?[.size] as? NSNumber,
+                  let sb = (try? fm.attributesOfItem(atPath: b))?[.size] as? NSNumber,
+                  sa == sb, sa.intValue <= 64 << 20 else { continue }
+            if fm.contentsEqual(atPath: a, andPath: b) { same.insert(rel) }
+        }
+        return same
+    }
+
+    /// `git branch <name> <commit>` (never moves an existing branch).
+    static func createBranch(_ name: String, at commit: String, in dir: String) async throws {
+        guard !name.hasPrefix("-"), !commit.hasPrefix("-") else { throw GitError.invalidBaseRef(commit) }
+        try await git(["branch", "--no-track", name, commit], in: dir)
+    }
+
+    /// Short name of `branch`'s upstream (`origin/main`), nil when it has none.
+    static func upstream(of branch: String, in dir: String) async -> String? {
+        guard !branch.hasPrefix("-"), await resolveCommit(branch + "@{upstream}", in: dir) != nil else { return nil }
+        return await gitOutput(["rev-parse", "--abbrev-ref", "--symbolic-full-name", branch + "@{upstream}"], in: dir)
+    }
+
+    /// `git merge-base --is-ancestor a b`.
+    static func isAncestor(_ a: String, of b: String, in dir: String) async -> Bool {
+        guard !a.hasPrefix("-"), !b.hasPrefix("-"),
+              let r = try? await git(["merge-base", "--is-ancestor", a, b], in: dir, check: false) else { return false }
+        return r.status == 0
+    }
+
     static func worktreeList(_ repo: String) async throws -> [WorktreeEntry] {
         WorktreeEntry.parseList(try await git(["worktree", "list", "--porcelain"], in: repo).out)
     }
@@ -362,33 +426,53 @@ enum GitService {
         var baseName: String?
         var skippedUntracked: Int
         var truncated: Bool
+        /// Branch checked out in the folder right now; nil when HEAD is detached.
+        var branch: String?
     }
 
-    /// nil when `cwd` is not inside a repository.
+    /// nil when `cwd` is not inside a repository. Throws `CancellationError` when the task was
+    /// cancelled, so a killed git call is never read as "not a repository".
     static func loadDiff(cwd: String, baseRef: String?) async throws -> DiffSnapshot? {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: cwd, isDirectory: &isDir), isDir.boolValue else {
             throw GitError.folderMissing(cwd)
         }
-        guard let top = await repoRoot(cwd) else { return nil }
+        guard let top = await repoRoot(cwd) else {
+            try Task.checkCancellation()
+            return nil
+        }
 
         var base = "HEAD"
         var baseName: String?
         if let ref = baseRef?.trimmingCharacters(in: .whitespacesAndNewlines), !ref.isEmpty,
-           await resolveCommit(ref, in: top) != nil, let mb = await mergeBase(ref, "HEAD", in: top) {
-            base = mb
-            baseName = GitRefs.isCommitHash(ref) ? String(ref.prefix(7)) : ref
-        } else if await resolveCommit("HEAD", in: top) == nil {
+           await resolveCommit(ref, in: top) != nil {
+            var upstreamRef: String?
+            var behind = false
+            if !GitRefs.isCommitHash(ref), let up = await upstream(of: ref, in: top) {
+                upstreamRef = up
+                behind = await isAncestor(ref, of: up, in: top)
+            }
+            let compare = GitRefs.diffBase(baseRef: ref, upstream: upstreamRef, localIsAncestorOfUpstream: behind)
+            if let mb = await mergeBase(compare, "HEAD", in: top) {
+                base = mb
+                baseName = GitRefs.isCommitHash(compare) ? String(compare.prefix(7)) : compare
+            }
+        }
+        if baseName == nil, await resolveCommit("HEAD", in: top) == nil {
             // No commits yet: compare against the empty tree.
             base = await gitOutput(["hash-object", "-t", "tree", "/dev/null"], in: top) ?? "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
         }
+        let branch = await currentBranch(top)
+        // Every query above swallows errors; a cancelled one would have picked the wrong base.
+        try Task.checkCancellation()
 
         let resolvedBase = base
         async let tracked = diff(top, base: resolvedBase)
         async let untracked = untrackedFiles(top)
         let (t, u) = try await (tracked, untracked)
         let files = (t.files + u.files).sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
-        return DiffSnapshot(files: files, baseName: baseName, skippedUntracked: u.skipped, truncated: t.truncated)
+        return DiffSnapshot(files: files, baseName: baseName, skippedUntracked: u.skipped, truncated: t.truncated,
+                            branch: branch)
     }
 
     static func diff(_ toplevel: String, base: String) async throws -> (files: [DiffFile], truncated: Bool) {

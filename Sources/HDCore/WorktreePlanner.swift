@@ -61,6 +61,44 @@ public enum WorktreePlanner {
         return taken.contains { $0 == c || $0.hasPrefix(c + "/") || c.hasPrefix($0 + "/") }
     }
 
+    /// Branch that keeps a detached HEAD's commits before its worktree is removed:
+    /// `hd/rescued-<slug of the session branch or folder>-<short sha>`, unique against `existing`.
+    public static func rescueBranch(sessionBranch: String?, worktreeName: String, head: String,
+                                    existing: [String]) -> String {
+        let source = sessionBranch.map { slug(forBranch: $0) } ?? slug(from: worktreeName)
+        let short = String(head.prefix(7)).lowercased()
+        let taken = existing.map { $0.lowercased() }
+        let prefix = taken.contains(String(branchPrefix.dropLast())) ? "hd-" : branchPrefix
+        let base = "\(prefix)rescued-\(source)-\(short)"
+        if !refConflicts(base, taken) { return base }
+        for n in 2...999 where !refConflicts("\(base)-\(n)", taken) {
+            return "\(base)-\(n)"
+        }
+        return "\(base)-\(UUID().uuidString.prefix(8).lowercased())"
+    }
+
+    /// Ignored folder names that only hold build output or downloaded dependencies.
+    public static let regenerableFolders: Set<String> = [
+        "node_modules", ".build", "build", "dist", "out", "target", "DerivedData", "Pods", "Carthage",
+        ".next", ".nuxt", ".svelte-kit", ".turbo", ".parcel-cache", ".cache", ".gradle", ".dart_tool",
+        ".expo", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv", ".tox",
+        ".swiftpm", "xcuserdata", "coverage",
+    ]
+    static let junkFileNames: Set<String> = [".DS_Store"]
+    static let junkFileSuffixes = [".pyc", ".pyo", ".xcuserstate", ".tsbuildinfo"]
+
+    /// Gitignored paths (`git status --ignored=matching`, folders end in `/`) that removing a worktree
+    /// would delete and that can't simply be rebuilt: drops build/dependency folders at any depth and
+    /// OS or editor junk, keeps the rest (`.env`, plists, local config).
+    public static func ignoredWorthKeeping(_ paths: [String]) -> [String] {
+        paths.filter { path in
+            let parts = path.split(separator: "/").map(String.init)
+            if parts.contains(where: regenerableFolders.contains) { return false }
+            guard !path.hasSuffix("/"), let name = parts.last else { return true }
+            return !junkFileNames.contains(name) && !junkFileSuffixes.contains { name.hasSuffix($0) }
+        }
+    }
+
     /// Folder that holds a repo's worktrees: the project's override or `<parent>/<repo>-worktrees`.
     /// A relative override is taken relative to the repo; `~` is expanded.
     public static func worktreeParent(repoRoot: String, worktreeRoot: String?) -> String {
@@ -124,6 +162,64 @@ public enum BranchNameProblem: Equatable, Sendable {
     case componentStartsWithDot
     case lockSuffix
     case reserved
+}
+
+/// An operation left unfinished in a worktree; removing the worktree throws its state away.
+public enum GitOperation: String, CaseIterable, Sendable, Equatable {
+    case rebase, merge, cherryPick, revert, bisect
+
+    /// Names under the worktree's git dir (`git rev-parse --absolute-git-dir`) that mark each operation.
+    public static let markers: [(name: String, operation: GitOperation)] = [
+        ("rebase-merge", .rebase), ("rebase-apply", .rebase), ("MERGE_HEAD", .merge),
+        ("CHERRY_PICK_HEAD", .cherryPick), ("REVERT_HEAD", .revert), ("BISECT_LOG", .bisect),
+    ]
+
+    /// Operations in progress, given the marker names that exist; each listed once, in `markers` order.
+    public static func inProgress(existing: Set<String>) -> [GitOperation] {
+        var found: [GitOperation] = []
+        for marker in markers where existing.contains(marker.name) && !found.contains(marker.operation) {
+            found.append(marker.operation)
+        }
+        return found
+    }
+}
+
+/// What `git worktree remove` would throw away, checked before removing.
+public struct WorktreeRemovalRisks: Equatable, Sendable {
+    /// Uncommitted and untracked paths (`git status`).
+    public var uncommitted: [String]
+    /// Gitignored files and folders that aren't build output or unchanged copies of the main checkout.
+    public var ignored: [String]
+    public var operations: [GitOperation]
+    /// Commits reachable only from the worktree's detached HEAD (no branch, tag or remote has them).
+    public var unreachableCommits: Int
+    /// HEAD commit, set when `unreachableCommits > 0`.
+    public var head: String?
+    /// Branch those commits are saved to before the folder is removed.
+    public var rescueBranch: String?
+
+    public init(uncommitted: [String] = [], ignored: [String] = [], operations: [GitOperation] = [],
+                unreachableCommits: Int = 0, head: String? = nil, rescueBranch: String? = nil) {
+        self.uncommitted = uncommitted
+        self.ignored = ignored
+        self.operations = operations
+        self.unreachableCommits = unreachableCommits
+        self.head = head
+        self.rescueBranch = rescueBranch
+    }
+
+    /// Something only the user can decide to lose. Detached commits don't count: they are rescued.
+    public var needsConfirmation: Bool { !uncommitted.isEmpty || !ignored.isEmpty || !operations.isEmpty }
+
+    /// Splits `git status --porcelain=v1 --ignored=matching` entries into uncommitted and ignored paths.
+    public static func split(_ entries: [GitOutput.StatusEntry]) -> (uncommitted: [String], ignored: [String]) {
+        var uncommitted: [String] = []
+        var ignored: [String] = []
+        for e in entries {
+            if e.code == "!!" { ignored.append(e.path) } else { uncommitted.append(e.path) }
+        }
+        return (uncommitted, ignored)
+    }
 }
 
 /// One entry of `git worktree list --porcelain`.
@@ -202,5 +298,14 @@ public enum GitRefs {
         }
         if r.isEmpty || r == "HEAD" || r.hasPrefix("HEAD~") || r.hasPrefix("HEAD^") || isCommitHash(r) { return nil }
         return r
+    }
+
+    /// Ref whose merge-base with HEAD the Changes diff starts from. A local base branch that is behind
+    /// (or level with) its upstream is swapped for the upstream, so commits pulled in with
+    /// `rebase origin/main` don't show up as the session's own. Otherwise the local base stays: commit
+    /// hashes, no upstream, local ahead (unpushed commits), or diverged.
+    public static func diffBase(baseRef: String, upstream: String?, localIsAncestorOfUpstream: Bool) -> String {
+        guard !isCommitHash(baseRef), let upstream, !upstream.isEmpty, localIsAncestorOfUpstream else { return baseRef }
+        return upstream
     }
 }
