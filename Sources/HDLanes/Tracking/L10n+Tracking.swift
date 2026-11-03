@@ -144,4 +144,5 @@ extension L {
         pick("First prompt of review sessions started from Tracking. Empty uses the default. Placeholders: \(placeholders)",
              "Takip'ten başlatılan review oturumlarının ilk istemi. Boşsa varsayılan kullanılır. Yer tutucular: \(placeholders)")
     }
+    static var loadingPullRequests: String { pick("Reading pull requests…", "PR'lar okunuyor…") }
 }

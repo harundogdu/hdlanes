@@ -123,3 +123,20 @@ struct UsageWindowTests {
         #expect(UsageWindow(usedPercent: 7, resetsAt: nil, windowMinutes: nil).percent(at: now) == 7)
     }
 }
+
+struct LegacyStateTests {
+    /// A state.json written before lastResult / lastResultAt / reviewPullRequestURL / reviewPromptTemplate
+    /// existed must still load, with those fields nil.
+    @Test func stateWithoutTrackingFieldsLoads() throws {
+        let json = #"""
+        {"version":1,"accounts":[],"tasks":[],"usage":{},"settings":{},
+         "projects":[{"id":"00000000-0000-0000-0000-0000000000AA","name":"p","path":"/tmp/p"}],
+         "sessions":[{"id":"00000000-0000-0000-0000-0000000000BB","projectID":"00000000-0000-0000-0000-0000000000AA",
+                      "title":"t","provider":"claude","cwd":"/tmp/p","createdAt":"2026-11-01T10:00:00Z"}]}
+        """#
+        let state = try StateStore.makeDecoder().decode(AppState.self, from: Data(json.utf8))
+        #expect(state.sessions.first?.lastResult == nil)
+        #expect(state.sessions.first?.lastResultAt == nil)
+        #expect(state.projects.first?.reviewPromptTemplate == nil)
+    }
+}

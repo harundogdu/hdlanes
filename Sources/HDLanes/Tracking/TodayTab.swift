@@ -60,7 +60,8 @@ struct TodayTab: View {
                     }
                 }
                 TrackingSection(title: L.sectionMyPullRequests, count: mine.count,
-                                empty: model.tracking.hasPullRequestSources ? L.emptyMyPullRequests : L.emptyNoRemotes,
+                                empty: !model.tracking.hasRefreshedOnce ? L.loadingPullRequests
+                                    : (model.tracking.hasPullRequestSources ? L.emptyMyPullRequests : L.emptyNoRemotes),
                                 isEmpty: mine.isEmpty) {
                     ForEach(mine) { pr in pullRequestRow(pr, reason: nil) }
                 }

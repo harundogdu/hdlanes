@@ -28,7 +28,9 @@ final class TrackingStore {
     @ObservationIgnored var debouncer = ActivityDebouncer()
     @ObservationIgnored var loggedMerged: Set<String> = []
     @ObservationIgnored var refreshQueued = false
-    @ObservationIgnored var hasRefreshedOnce = false
+    var hasRefreshedOnce = false
+    /// Sessions whose turn ended before its final message arrived (OSC done ahead of the Stop hook).
+    @ObservationIgnored var awaitingResult: Set<UUID> = []
 
     var hasPullRequestSources: Bool { !projectRepoKeys.isEmpty }
 }

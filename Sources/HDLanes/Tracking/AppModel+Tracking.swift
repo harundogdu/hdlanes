@@ -31,18 +31,28 @@ extension AppModel {
         switch new {
         case .done:
             tracking.attentionSince[id] = nil
+            // Only a turn that was actually running finished; needs-you → done (answered in the terminal)
+            // is not a new result.
+            guard old.isWorking || old == .starting else { return }
             let message = ActivityEvent.clip(runtimes[id]?.snapshot.lastAssistantMessage, limit: ActivityEvent.detailLimit)
-            updateSession(id) {
-                $0.lastResult = message
-                $0.lastResultAt = Date()
+            if let message, message != session.lastResult {
+                updateSession(id) {
+                    $0.lastResult = message
+                    $0.lastResultAt = Date()
+                }
+                recordActivity(.turnDone, sessionID: id, detail: message)
+            } else {
+                // The message (Stop hook) is still on its way; trackingResultArrived logs the turn once.
+                tracking.awaitingResult.insert(id)
             }
-            recordActivity(.turnDone, sessionID: id, detail: message)
         case .needsYou(let kind, let detail):
             if !old.needsUser { tracking.attentionSince[id] = Date() }
-            recordActivity(.needsYou, sessionID: id, detail: [L.notifyNeedsYou(kind), detail].compactMap { $0 }.joined(separator: " · "))
+            // Tool name only: a permission prompt's arguments (a full command line) may carry secrets.
+            let tool = detail.flatMap { $0.split(separator: ":", maxSplits: 1).first.map(String.init) }
+            recordActivity(.needsYou, sessionID: id, detail: [L.notifyNeedsYou(kind), tool].compactMap { $0 }.joined(separator: " · "))
         case .error(let message):
             if case .error = old {} else { tracking.attentionSince[id] = Date() }
-            recordActivity(.error, sessionID: id, detail: message)
+            recordActivity(.error, sessionID: id, detail: ActivityEvent.clip(message, limit: 160))
         default:
             tracking.attentionSince[id] = nil
         }
@@ -51,9 +61,10 @@ extension AppModel {
     /// Called by the runtime's `commit` when a finished turn's message arrives after the status already
     /// read done (OSC 7501 `done` can come before Claude's Stop hook, which carries the message).
     func trackingResultArrived(_ id: UUID) {
-        guard let session = session(id), session.isArchived != true,
+        guard tracking.awaitingResult.contains(id), let session = session(id), session.isArchived != true,
               let message = ActivityEvent.clip(runtimes[id]?.snapshot.lastAssistantMessage, limit: ActivityEvent.detailLimit),
               message != session.lastResult else { return }
+        tracking.awaitingResult.remove(id)
         updateSession(id) {
             $0.lastResult = message
             $0.lastResultAt = Date()
@@ -109,12 +120,17 @@ extension AppModel {
         for r in results {
             prs += r.prs
             if let issue = r.issue {
+                if case .failed(_, let text) = issue, text.localizedCaseInsensitiveContains("cancel") { continue }
                 issues[issue.tool] = issues[issue.tool] ?? issue
             } else {
                 readRepos.insert(r.repo.key)
             }
         }
-        let fresh = PullRequest.dedupe(prs)
+        // Leaving the Tracking view cancels this sweep (and kills gh/az): keep what we had.
+        guard !Task.isCancelled else { return }
+        // A repo whose read failed keeps its previous PRs instead of going blank until the next tick.
+        let kept = tracking.pullRequests.filter { !readRepos.contains($0.repoKey) && repos[$0.repoKey] != nil }
+        let fresh = PullRequest.dedupe(prs + kept)
 
         // My PRs that left the open list of a repository read cleanly: merged or closed.
         let freshIDs = Set(fresh.map(\.id))
