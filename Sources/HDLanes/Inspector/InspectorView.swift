@@ -6,7 +6,72 @@ import SwiftUI
 struct InspectorView: View {
     let sessionID: UUID
 
+    @Environment(AppModel.self) private var model
+
     var body: some View {
-        Text(verbatim: "")
+        @Bindable var model = model
+        VStack(spacing: 0) {
+            if model.session(sessionID) == nil {
+                ContentUnavailableView(L.inspectorSessionMissing, systemImage: "sidebar.right",
+                                       description: Text(L.inspectorSessionMissingDetail))
+            } else {
+                Picker(selection: $model.inspectorTab) {
+                    ForEach(InspectorTab.allCases) { tab in
+                        Text(title(for: tab)).tag(tab)
+                    }
+                } label: {
+                    EmptyView()
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                Divider()
+                Group {
+                    switch model.inspectorTab {
+                    case .changes: ChangesView(sessionID: sessionID)
+                    case .agents: AgentsPanel(sessionID: sessionID)
+                    case .browser: BrowserPanel(sessionID: sessionID)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .id(sessionID)
+        .task(id: sessionID) { await autoRefresh() }
+    }
+
+    private func title(for tab: InspectorTab) -> String {
+        switch tab {
+        case .changes: return L.tabWithCount(L.tabChanges, model.diffs[sessionID]?.files.count ?? 0)
+        case .agents: return L.tabWithCount(L.tabAgents, model.runtimes[sessionID]?.snapshot.runningSubagents.count ?? 0)
+        case .browser: return L.tabBrowser
+        }
+    }
+
+    /// Refreshes the diff on appear, then every 3 s when the agent did something (a tool call started or
+    /// ended, the status changed), and at least every 30 s for edits made outside the agent.
+    private func autoRefresh() async {
+        guard model.session(sessionID) != nil else { return }
+        await model.refreshDiff(sessionID)
+        var lastSignature = activitySignature()
+        var lastRefresh = Date()
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled, model.session(sessionID) != nil else { return }
+            let signature = activitySignature()
+            if signature != lastSignature || Date().timeIntervalSince(lastRefresh) >= 30 {
+                lastSignature = signature
+                lastRefresh = Date()
+                await model.refreshDiff(sessionID)
+            }
+        }
+    }
+
+    private func activitySignature() -> String {
+        guard let snapshot = model.runtimes[sessionID]?.snapshot else { return "" }
+        let last = snapshot.activity.last
+        return "\(snapshot.activity.count)|\(last?.id ?? "")|\(last?.isRunning ?? false)|\(snapshot.status)"
     }
 }
