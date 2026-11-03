@@ -58,8 +58,9 @@ struct TrackingView: View {
         }
         .navigationTitle(L.tracking)
         .task {
-            // Runs while the view is on screen; cancelled when the user leaves Tracking.
-            await model.refreshPullRequests()
+            // Runs while the view is on screen; cancelled when the user leaves Tracking. The launch-time
+            // read from the sidebar row may still be running: don't queue a second sweep behind it.
+            if !model.tracking.isRefreshing { await model.refreshPullRequests() }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: Self.refreshInterval * 1_000_000_000)
                 guard !Task.isCancelled else { return }

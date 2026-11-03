@@ -135,6 +135,9 @@ extension L {
     }
     static var reviewPrompt: String { pick("First prompt", "İlk istem") }
     static var reviewPreparing: String { pick("Fetching the branch…", "Dal çekiliyor…") }
+    static var reviewBranchUnusable: String {
+        pick("This pull request's branch name can't be used here.", "Bu PR'ın dal adı burada kullanılamıyor.")
+    }
     static var startReview: String { pick("Start Review", "Review'u Başlat") }
     static var reviewPromptTemplate: String { pick("Review prompt", "Review istemi") }
     static func reviewTemplateFooter(_ placeholders: String) -> String {

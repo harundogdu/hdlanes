@@ -285,8 +285,10 @@ extension AppModel {
         }
         let rt = runtime(for: id)
         let old = rt.snapshot.status
+        let oldMessage = rt.snapshot.lastAssistantMessage
         if rt.snapshot != snapshot { rt.snapshot = snapshot }
         statusChanged(id, from: old, to: snapshot.status)
+        if old == .done, snapshot.status == .done, snapshot.lastAssistantMessage != oldMessage { trackingResultArrived(id) }
     }
 
     private func statusChanged(_ id: UUID, from old: AgentStatus, to new: AgentStatus) {

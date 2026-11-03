@@ -48,6 +48,19 @@ extension AppModel {
         }
     }
 
+    /// Called by the runtime's `commit` when a finished turn's message arrives after the status already
+    /// read done (OSC 7501 `done` can come before Claude's Stop hook, which carries the message).
+    func trackingResultArrived(_ id: UUID) {
+        guard let session = session(id), session.isArchived != true,
+              let message = ActivityEvent.clip(runtimes[id]?.snapshot.lastAssistantMessage, limit: ActivityEvent.detailLimit),
+              message != session.lastResult else { return }
+        updateSession(id) {
+            $0.lastResult = message
+            $0.lastResultAt = Date()
+        }
+        recordActivity(.turnDone, sessionID: id, detail: message)
+    }
+
     func recordTaskMoved(_ id: UUID, to status: TaskStatus) {
         guard let t = task(id) else { return }
         recordActivity(.taskMoved, projectID: t.projectID, title: t.title, detail: L.taskStatusName(status))
@@ -279,7 +292,7 @@ extension AppModel {
         guard let project = project(projectID) else { throw WorkspaceError.projectMissing }
         guard let repo = await repositoryRoot(for: project.path) else { throw GitError.notRepository(project.path) }
         for branch in [pr.sourceBranch, pr.targetBranch] where branch.isEmpty || branch.hasPrefix("-") {
-            throw WorkspaceError.invalidBranch(branch)
+            throw WorkspaceError.invalidBranch(L.reviewBranchUnusable)
         }
         guard let account = account(accountID).flatMap({ $0.provider == provider ? $0 : nil })
                 ?? defaultAccount(for: provider, project: project) else { throw WorkspaceError.noAccount(provider) }
