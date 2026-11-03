@@ -116,6 +116,8 @@ extension AppModel {
         return project.id
     }
 
+    func project(_ id: UUID?) -> Project? { id.flatMap { id in state.projects.first { $0.id == id } } }
+
     func updateProject(_ id: UUID, _ change: (inout Project) -> Void) {
         guard let i = state.projects.firstIndex(where: { $0.id == id }) else { return }
         change(&state.projects[i])
@@ -181,16 +183,12 @@ extension AppModel {
     /// The work behind `closeSession`. When the worktree can't be removed the session stays (stopped).
     func closeSessionThrowing(_ id: UUID, removeWorktree: Bool) async throws {
         guard let session = session(id) else { return }
-        let order = sidebarSessionIDs
         stop(id)
-        terminals.remove(id)
         if removeWorktree, session.worktreePath != nil {
+            // On failure the terminal (and its shell) stays, so the session is left as it was.
             try await self.removeWorktree(sessionID: id, force: false)
         }
-        updateSession(id) { $0.isArchived = true }
-        if selectedSessionID == id {
-            selection = SessionOrdering.neighbor(of: id, in: order).map { .session($0) }
-        }
+        archiveSession(id)
     }
 
     /// Stops a session and hides it; its record stays in state.json.
@@ -198,6 +196,8 @@ extension AppModel {
         let order = sidebarSessionIDs
         stop(id)
         terminals.remove(id)
+        // A removed view no longer reports its exit, so clear the running flag here.
+        runtimes[id]?.isProcessRunning = false
         updateSession(id) { $0.isArchived = true }
         if selectedSessionID == id {
             selection = SessionOrdering.neighbor(of: id, in: order).map { .session($0) }

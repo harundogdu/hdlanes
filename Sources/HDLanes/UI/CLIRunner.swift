@@ -81,8 +81,14 @@ enum CLIRunner {
 
         let collector = Collector()
         // Read as data arrives so a chatty child can't fill the pipe and block.
-        outPipe.fileHandleForReading.readabilityHandler = { h in collector.append(h.availableData, toErr: false) }
-        errPipe.fileHandleForReading.readabilityHandler = { h in collector.append(h.availableData, toErr: true) }
+        for (pipe, isErr) in [(outPipe, false), (errPipe, true)] {
+            pipe.fileHandleForReading.readabilityHandler = { h in
+                let data = h.availableData
+                // Empty data means EOF; without clearing the handler it would keep firing.
+                if data.isEmpty { h.readabilityHandler = nil; return }
+                collector.append(data, toErr: isErr)
+            }
+        }
 
         do {
             try process.run()
