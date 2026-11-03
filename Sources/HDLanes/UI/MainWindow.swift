@@ -24,6 +24,7 @@ struct MainWindow: View {
         .sheet(isPresented: $model.isNewSessionSheetPresented) { NewSessionSheet() }
         .sheet(isPresented: $model.isNewTaskSheetPresented) { TaskEditorSheet(taskID: nil) }
         .sheet(isPresented: $model.isAddAccountSheetPresented) { AddAccountSheet() }
+        .sheet(item: $model.importPreset) { ImportSheet(preset: $0) }
         .alert(model.alert?.title ?? "", isPresented: isPresented($model.alert), presenting: model.alert) { _ in
             Button(L.ok) {}
         } message: { alert in
@@ -116,6 +117,8 @@ struct WelcomeView: View {
                     Button(L.addProjectEllipsis) { Task { await Panels.addProject(model: model) } }
                 }
                 Button(L.newSession) { model.isNewSessionSheetPresented = true }
+                Button(L.importEllipsis) { model.importPreset = ImportPreset(tab: .sessions) }
+                    .help(L.importHelp)
                 Button(L.accounts) { showAccounts = true }
             }
             .fixedSize()

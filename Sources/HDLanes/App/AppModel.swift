@@ -66,6 +66,8 @@ final class AppModel {
     var newSessionPreset: NewSessionPreset?
     var isAddAccountSheetPresented = false
     var isNewTaskSheetPresented = false
+    /// Set to open the import sheet (`UI/ImportSheet.swift`).
+    var importPreset: ImportPreset?
 
     @ObservationIgnored let terminals = TerminalRegistry()
 
