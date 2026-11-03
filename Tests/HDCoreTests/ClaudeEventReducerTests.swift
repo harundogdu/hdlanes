@@ -82,6 +82,25 @@ struct ClaudeEventReducerTests {
         #expect(h.s.subagents.last?.type == "agent")
     }
 
+    @Test func bareHelperSubagentsDropOutOfTheRunningListAfterTheGrace() {
+        var h = Harness()
+        h.send("UserPromptSubmit", #""prompt":"go""#)
+        h.send("SubagentStart", #""agent_id":"helper""#)                      // Claude's own, says nothing
+        let started = h.clock
+        h.send("PreToolUse", #""tool_name":"Agent","tool_use_id":"t1","tool_input":{"description":"Find files"}"#)
+        h.send("SubagentStart", #""agent_id":"real","agent_type":"Explore""#)
+        h.send("SubagentStart", #""agent_id":"busy""#)
+        h.send("PreToolUse", #""tool_name":"Read","tool_use_id":"r1","tool_input":{"file_path":"/a"},"agent_id":"busy""#)
+        // Young: still shown, it may yet get a tool call.
+        #expect(h.s.visibleRunningSubagents(at: started.addingTimeInterval(1)).map(\.id) == ["helper", "real", "busy"])
+        let later = started.addingTimeInterval(SubagentInfo.helperGrace + 1)
+        #expect(h.s.visibleRunningSubagents(at: later).map(\.id) == ["real", "busy"])
+        #expect(h.s.runningSubagents.count == 3, "the snapshot itself keeps every agent")
+        // A late first tool call brings it back.
+        h.send("PreToolUse", #""tool_name":"Grep","tool_use_id":"g1","tool_input":{"pattern":"x"},"agent_id":"helper""#)
+        #expect(h.s.visibleRunningSubagents(at: later).map(\.id) == ["helper", "real", "busy"])
+    }
+
     @Test func subagentToolWithoutStartStillShows() {
         var h = Harness()
         h.send("PreToolUse", #""tool_name":"Read","tool_use_id":"t1","tool_input":{"file_path":"/a/b/c/File.swift"},"agent_id":"zz","agent_type":"Plan""#)

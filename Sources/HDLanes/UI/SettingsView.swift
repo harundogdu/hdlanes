@@ -41,7 +41,7 @@ private struct GeneralSettings: View {
                 Toggle(L.notifyDone, isOn: flag(\.notifyDone, default: true))
             }
             Section(L.permissions) {
-                Toggle(L.permissionsInSidebar, isOn: flag(\.permissionsInSidebar, default: true))
+                Toggle(L.permissionsInSidebar, isOn: permissionsInSidebar)
                 Text(L.permissionsInSidebarNote)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -60,6 +60,17 @@ private struct GeneralSettings: View {
                 set: { lang in
                     L.language = lang
                     model.state.settings.language = lang
+                })
+    }
+
+    /// The plugin's hooks.json has the PermissionRequest hook only while this is on, so a change rewrites
+    /// it; new Claude sessions then load the new one.
+    private var permissionsInSidebar: Binding<Bool> {
+        Binding(get: { model.state.settings.permissionsInSidebar ?? true },
+                set: { on in
+                    let old = model.state.settings.permissionsInSidebar ?? true
+                    model.state.settings.permissionsInSidebar = on
+                    if old != on { model.refreshClaudePlugin() }
                 })
     }
 

@@ -421,6 +421,29 @@ public struct ClaudeEventReducer: Sendable {
     }
 }
 
+extension SubagentInfo {
+    /// How long a bare subagent (no task text, no tool call) is shown before it counts as a helper.
+    public static let helperGrace: TimeInterval = 3
+
+    /// No task text and no tool call yet.
+    public var isBare: Bool {
+        (description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty && toolCount == 0
+    }
+
+    /// Claude's internal helper agents show up as bare "agent" rows that never say what they do. A real
+    /// subagent gets its description or a first tool call within `helperGrace`.
+    public func isBareHelper(at now: Date) -> Bool {
+        isBare && now.timeIntervalSince(startedAt) > Self.helperGrace
+    }
+}
+
+extension AgentRuntimeSnapshot {
+    /// Running subagents worth a line in the sidebar: bare helpers past `SubagentInfo.helperGrace` are left out.
+    public func visibleRunningSubagents(at now: Date) -> [SubagentInfo] {
+        runningSubagents.filter { !$0.isBareHelper(at: now) }
+    }
+}
+
 /// One-line summaries of tool inputs for the activity feed and permission cards.
 public enum ClaudeToolSummary {
     public static let maxLength = 120

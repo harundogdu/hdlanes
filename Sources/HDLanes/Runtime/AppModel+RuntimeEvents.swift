@@ -30,7 +30,9 @@ extension AppModel {
     /// One message from `hdlanes-hook`. `connection` is set for a PermissionRequest waiting for an answer.
     func handleHook(_ message: HookMessage, connection: HookServer.ConnectionID?) {
         let services = runtimeServices
-        guard let id = UUID(uuidString: message.session), let session = session(id), session.provider == .claude else {
+        // An archived session's agent is gone; a late hook from it changes nothing.
+        guard let id = UUID(uuidString: message.session), let session = session(id), session.provider == .claude,
+              session.isArchived != true else {
             if let connection { services.hookServer?.reply(connection, HookReply(decision: .none)) }
             return
         }
@@ -42,17 +44,21 @@ extension AppModel {
         let rt = runtime(for: id)
         var snapshot = rt.snapshot
         var reducer = services.reducers[id] ?? ClaudeEventReducer()
+        let cardBefore = snapshot.pendingPermission?.id
         reducer.apply(event: message.event, payload: message.payload, to: &snapshot, now: now)
 
         if message.event == ClaudePluginFiles.permissionEvent, let connection {
-            if snapshot.pendingPermission != nil, state.settings.permissionsInSidebar != false {
-                if let previous = services.permissionConnections[id], previous != connection {
-                    services.hookServer?.reply(previous, HookReply(decision: .none))
+            if let card = snapshot.pendingPermission, card.id != cardBefore, state.settings.permissionsInSidebar != false {
+                // This request made the card, so its hook is the one that answers it. A hook still
+                // waiting for an older card gets no decision (Claude shows its own prompt for that one).
+                if let previous = services.permissionConnections[id], previous.connection != connection {
+                    services.hookServer?.reply(previous.connection, HookReply(decision: .none))
                 }
-                services.permissionConnections[id] = connection
+                services.permissionConnections[id] = PermissionWait(connection: connection, permissionID: card.id)
                 snapshot.pendingPermission?.canAnswer = true
             } else {
-                // Not answerable here (a question, or the setting is off): Claude shows its own prompt.
+                // No new card (a question, or the setting is off): Claude shows its own prompt for this
+                // request, and an existing card keeps its own hook.
                 services.hookServer?.reply(connection, HookReply(decision: .none))
             }
         }
@@ -72,7 +78,7 @@ extension AppModel {
 
     func handleHookConnectionClosed(_ connection: HookServer.ConnectionID) {
         let services = runtimeServices
-        guard let id = services.permissionConnections.first(where: { $0.value == connection })?.key else { return }
+        guard let id = services.permissionConnections.first(where: { $0.value.connection == connection })?.key else { return }
         services.permissionConnections[id] = nil
         let rt = runtime(for: id)
         var snapshot = rt.snapshot
@@ -117,8 +123,9 @@ extension AppModel {
 
     func handleRolloutLines(from watcher: RolloutWatcher, _ lines: [CodexRolloutLine]) {
         let id = watcher.sessionID
-        // A batch from a watcher replaced by a relaunch belongs to the previous run.
-        guard runtimeServices.watchers[id] === watcher, let session = session(id) else { return }
+        // A batch from a watcher replaced by a relaunch belongs to the previous run; an archived
+        // session's watcher should be gone already.
+        guard runtimeServices.watchers[id] === watcher, let session = session(id), session.isArchived != true else { return }
         let rt = runtime(for: id)
         var snapshot = rt.snapshot
         let now = Date()
@@ -239,10 +246,7 @@ extension AppModel {
     }
 
     private func agentExitedInShell(_ id: UUID) {
-        let services = runtimeServices
-        services.agentSeenInForeground.remove(id)
-        services.shellForegroundTicks[id] = nil
-        services.watchers.removeValue(forKey: id)?.stop()
+        endRuntime(id)
         let rt = runtime(for: id)
         if case .exited = rt.snapshot.status { return }
         var snapshot = rt.snapshot
@@ -260,14 +264,8 @@ extension AppModel {
 
     /// Fresh live state for a (re)launch; the persisted session is untouched.
     func resetLiveState(_ id: UUID, agentSessionID: String?) {
-        let services = runtimeServices
-        if let connection = services.permissionConnections.removeValue(forKey: id) {
-            services.hookServer?.reply(connection, HookReply(decision: .none))
-        }
-        services.watchers.removeValue(forKey: id)?.stop()
-        services.reducers[id] = ClaudeEventReducer()
-        services.agentSeenInForeground.remove(id)
-        services.shellForegroundTicks[id] = nil
+        endRuntime(id)
+        runtimeServices.reducers[id] = ClaudeEventReducer()
         let rt = runtime(for: id)
         var snapshot = AgentRuntimeSnapshot(status: .starting)
         snapshot.agentSessionID = agentSessionID
@@ -279,9 +277,11 @@ extension AppModel {
     func commit(_ id: UUID, snapshot: AgentRuntimeSnapshot, reducer: ClaudeEventReducer?) {
         let services = runtimeServices
         if let reducer { services.reducers[id] = reducer }
-        // The card is gone (tool ran, turn ended…): let a still-waiting hook exit so Claude carries on.
-        if snapshot.pendingPermission == nil, let connection = services.permissionConnections.removeValue(forKey: id) {
-            services.hookServer?.reply(connection, HookReply(decision: .none))
+        // The card is gone or replaced (tool ran, turn ended…): let a hook still waiting for it exit so
+        // Claude carries on.
+        if let wait = services.permissionConnections[id], wait.permissionID != snapshot.pendingPermission?.id {
+            services.permissionConnections[id] = nil
+            services.hookServer?.reply(wait.connection, HookReply(decision: .none))
         }
         let rt = runtime(for: id)
         let old = rt.snapshot.status
@@ -291,12 +291,16 @@ extension AppModel {
 
     private func statusChanged(_ id: UUID, from old: AgentStatus, to new: AgentStatus) {
         guard old != new else { return }
+        func isError(_ status: AgentStatus) -> Bool { if case .error = status { return true } else { return false } }
         let becameDone = new == .done
+        // A turn that ended in an API error (usage limit, overload, billing) ended too; a changed
+        // message on an error that is already shown doesn't count again.
+        let becameError = isError(new) && !isError(old)
         var becameNeedsYou = false
         if case .needsYou(let kind, _) = new {
             if case .needsYou(let oldKind, _) = old { becameNeedsYou = kind != oldKind } else { becameNeedsYou = true }
         }
-        if becameDone || becameNeedsYou {
+        if becameDone || becameError || becameNeedsYou {
             let looking = NSApp.isActive && selectedSessionID == id
             if !looking {
                 runtime(for: id).unread = true
@@ -320,6 +324,13 @@ extension AppModel {
             let last = runtime(for: id).snapshot.lastAssistantMessage.map { String(Self.displayText($0).prefix(200)) }
             body = last.flatMap { $0.isEmpty ? nil : $0 } ?? L.notifyDoneBody
             sound = false
+        case .error(let message):
+            // The end of a turn, so it follows the "finished" setting; with a sound, it's not a success.
+            guard state.settings.notifyDone != false else { return }
+            let text = String(Self.displayText(message).prefix(200))
+            // OSC 7501 errors without a message arrive as the bare code "error".
+            body = text.isEmpty || text == "error" ? L.agentError("") : text
+            sound = true
         default:
             return
         }
