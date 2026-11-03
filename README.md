@@ -32,7 +32,13 @@ log out of anything.
 - **Answer permission prompts from the sidebar.** Claude's tool permission requests show up under the
   session with Allow and Deny. You can add a note when you deny.
 - **Subagents at a glance.** Running Claude subagents are listed under their session with the tool they
-  are using right now.
+  are using right now. The **Agents** tab shows every subagent and a live feed of tool calls (Claude and
+  Codex).
+- **Review the diff, then send notes back.** The **Changes** tab shows the session's changes against its
+  base branch. Leave notes on lines and send them to the agent as one message, or push the branch and open
+  a pull request with `gh`.
+- **Browser.** The **Browser** tab opens the dev server URLs a session prints (`localhost:3000` and the
+  like) next to its terminal.
 - **Usage meters.** Each account shows how much of its 5-hour and weekly limits it has used, taken from
   Claude's status line and Codex's rate-limit events. No extra requests are made.
 - **Task board.** Backlog, Active, Review and Done columns with drag and drop. A session can be started
@@ -85,7 +91,8 @@ removed.
 
 ## Requirements
 
-- macOS 14 Sonoma or later (Apple silicon or Intel)
+- macOS 14 Sonoma or later (Apple silicon or Intel). hdlanes is macOS only; a Windows port would be a
+  separate app, and contributions in that direction are welcome.
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and/or the
   [Codex CLI](https://github.com/openai/codex) installed and on your shell's PATH
 - git, for worktrees
@@ -110,6 +117,13 @@ During development you can also start it with `swift run hdlanes`.
 hdlanes keeps its data in `~/.hdlanes` (set `HDLANES_HOME` to use another folder). If `state.json` doesn't
 decode, hdlanes keeps a copy next to it before starting fresh. If it can't be read at all, hdlanes leaves it
 alone, shows a banner and doesn't save until the problem is fixed.
+
+## Status and known limits (v0.1)
+
+- Folder-trust questions from Claude Code and Codex in a new worktree are answered in the terminal.
+- Codex permission prompts are answered in the terminal; Allow/Deny in the sidebar is Claude only for now.
+- Quitting hdlanes ends every session's processes. Claude and Codex sessions can be resumed afterwards
+  (`claude --resume`, `codex resume`).
 
 ## Acknowledgements
 
