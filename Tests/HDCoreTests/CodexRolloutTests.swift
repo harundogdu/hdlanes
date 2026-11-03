@@ -220,6 +220,23 @@ struct CodexRolloutTests {
         #expect(CodexRollout.latestRateLimits(codexHome: try tempDir().path) == nil)
     }
 
+    /// Another Codex client wrote a burst of newer files that only carry null readings (seen on a real
+    /// machine: 8 of them); the real reading behind them must still be found.
+    @Test func latestRateLimitsLooksPastABurstOfNullOnlyFiles() throws {
+        let home = try tempDir()
+        let day = try dayDir(home, Date())
+        let reading = #"{"timestamp":"2026-11-03T14:00:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":2.0,"window_minutes":300,"resets_at":1793707612}}}}"#
+        let real = try write(day, "rollout-real.jsonl", [meta(cwd: "/a"), reading].joined(separator: "\n"))
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: real.path)
+        for i in 0..<12 {
+            let f = try write(day, "rollout-null-\(i).jsonl", [meta(cwd: "/b"),
+                                                               #"{"type":"event_msg","payload":{"type":"token_count","rate_limits":null}}"#].joined(separator: "\n"))
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-Double(i))], ofItemAtPath: f.path)
+        }
+        let found = try #require(CodexRollout.latestRateLimits(codexHome: home.path))
+        #expect(found.rateLimits.path("primary.used_percent")?.double == 2)
+    }
+
     @Test func codexHomeForAccounts() {
         let system = Account(provider: .codex, label: "d", colorIndex: 0, isSystemDefault: true, configDir: "/ignored", authMethod: .existing)
         let managed = Account(provider: .codex, label: "m", colorIndex: 0, isSystemDefault: false, configDir: "/h/acc", authMethod: .browser)

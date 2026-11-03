@@ -312,7 +312,9 @@ public enum CodexRollout {
     }
 
     /// The latest non-null `token_count.rate_limits` of a home, searching back across its newest files.
-    public static func latestRateLimits(codexHome: String, files: Int = 6) -> (rateLimits: JSONValue, at: Date?)? {
+    /// Other Codex clients (the desktop app, sub-agent threads) can write bursts of files whose readings
+    /// are all null, so look well past the first few; each file is only tail-scanned.
+    public static func latestRateLimits(codexHome: String, files: Int = 60) -> (rateLimits: JSONValue, at: Date?)? {
         for url in newestRolloutFiles(codexHome: codexHome, limit: files) {
             if let found = lastRateLimits(in: url) { return found }
         }
