@@ -250,6 +250,21 @@ struct DiffParserTests {
         #expect(f.lines[4].text == "new" && f.lines[4].newLine == 3)
     }
 
+    @Test func largeDiffParsesInLinearTime() throws {
+        let n = 100_000
+        var text = "diff --git a/big.txt b/big.txt\nindex 1..2 100644\n--- a/big.txt\n+++ b/big.txt\n@@ -1,\(n) +1,\(n) @@\n"
+        text.reserveCapacity(n * 24)
+        for i in 1...n { text += "-\(i)\n+\(i) changed\n" }
+        let clock = ContinuousClock()
+        var files: [DiffFile] = []
+        let elapsed = clock.measure { files = DiffParser.parse(text) }
+        let f = try #require(files.first)
+        #expect(f.additions == n && f.deletions == n)
+        #expect(f.lines.last?.newLine == n)
+        // Quadratic copying took minutes here; linear parsing takes well under a second in release.
+        #expect(elapsed < .seconds(15))
+    }
+
     @Test func truncatedOutputDoesNotCrash() {
         let cut = String(Self.mixed.prefix(400))
         let files = DiffParser.parse(cut)

@@ -10,34 +10,31 @@ import Foundation
 public enum DiffParser {
     public static func parse(_ text: String) -> [DiffFile] {
         var files: [DiffFile] = []
-        var current: FileBuilder?
+        // One builder mutated in place: copying it per line would copy its `lines` array (quadratic).
+        var b = FileBuilder()
+        var hasFile = false
 
         for rawSlice in text.utf8.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: false) {
             var line = Substring(rawSlice)
             if line.utf8.last == 13 { line = Substring(line.utf8.dropLast()) }
 
-            if var b = current, b.inHunk {
-                if b.consumeHunkLine(line) {
-                    current = b
-                    continue
-                }
-                // Malformed or truncated hunk: fall through and read the line as a header.
+            if hasFile && b.inHunk {
+                if b.consumeHunkLine(line) { continue }
+                // Malformed or truncated hunk: read the line as a header instead.
                 b.endHunk()
-                current = b
             }
 
             if line.hasPrefix("diff --git ") {
-                if let b = current { files.append(b.build()) }
-                var b = FileBuilder()
-                if let (a, bPath) = splitHeader(line.dropFirst("diff --git ".count)) {
-                    b.headerOld = a
-                    b.headerNew = bPath
+                if hasFile { files.append(b.build()) }
+                b = FileBuilder()
+                hasFile = true
+                if let (old, new) = splitHeader(line.dropFirst("diff --git ".count)) {
+                    b.headerOld = old
+                    b.headerNew = new
                 }
-                current = b
                 continue
             }
-            guard var b = current else { continue }
-            defer { current = b }
+            guard hasFile else { continue }
 
             if line.hasPrefix("@@ ") {
                 if let h = parseHunkHeader(line) { b.startHunk(h, text: String(line)) }
@@ -77,7 +74,7 @@ public enum DiffParser {
                 b.isBinary = true
             }
         }
-        if let b = current { files.append(b.build()) }
+        if hasFile { files.append(b.build()) }
         return files
     }
 
