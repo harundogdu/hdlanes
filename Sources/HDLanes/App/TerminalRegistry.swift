@@ -34,6 +34,13 @@ final class TerminalRegistry {
 
     func isRunning(_ id: UUID) -> Bool { views[id]?.process.running ?? false }
 
+    /// Shell pids (= terminal session ids) of every live terminal, including draining ones.
+    func runningShellPids() -> [pid_t] {
+        (Array(views.values) + Array(draining)).compactMap { v in
+            v.process.running && v.process.shellPid > 0 ? v.process.shellPid : nil
+        }
+    }
+
     /// Raw bytes to the PTY, as if typed.
     func sendRaw(_ id: UUID, _ text: String) {
         views[id]?.send(txt: text)
@@ -80,6 +87,7 @@ final class TerminalRegistry {
         v.removeFromSuperview()
         if v.process.running {
             draining.insert(v)
+            ProcessTree.hangUp(session: v.process.shellPid)
             v.terminate()
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self, weak v] in
                 if let v { self?.draining.remove(v) }

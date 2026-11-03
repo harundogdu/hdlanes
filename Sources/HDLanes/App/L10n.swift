@@ -35,6 +35,8 @@ enum L {
     static var close: String { pick("Close", "Kapat") }
 
     static func relative(_ date: Date, now: Date = Date()) -> String {
+        // Timestamps a moment ahead of the view's clock would read "in 0 sec."
+        if abs(now.timeIntervalSince(date)) < 10 { return pick("now", "şimdi") }
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .abbreviated
         f.locale = Locale(identifier: isTurkish ? "tr_TR" : "en_US")

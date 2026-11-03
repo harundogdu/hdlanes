@@ -89,16 +89,20 @@ struct CategoryChip: View {
 struct UsageMeter: View {
     let percent: Double?
     let color: Color
-    var width: CGFloat = 46
+    /// Fixed width, or nil to fill the space offered.
+    var width: CGFloat? = 46
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule().fill(.quaternary)
-            if let percent {
-                Capsule().fill(color).frame(width: max(2, width * min(1, max(0, percent / 100))))
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                if let percent {
+                    Capsule().fill(color).frame(width: max(2, geo.size.width * min(1, max(0, percent / 100))))
+                }
             }
         }
         .frame(width: width, height: 4)
+        .frame(minWidth: 24)
     }
 }
 

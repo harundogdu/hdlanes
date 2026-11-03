@@ -55,3 +55,15 @@ struct StateStoreTests {
         #expect(!dir.hasSuffix("/"))
     }
 }
+
+struct UsageWindowTests {
+    @Test func windowPastItsResetReadsEmpty() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let w = UsageWindow(usedPercent: 100, resetsAt: now.addingTimeInterval(-60), windowMinutes: 300)
+        #expect(w.percent(at: now) == 0)
+        #expect(w.hasReset(at: now))
+        let live = UsageWindow(usedPercent: 42, resetsAt: now.addingTimeInterval(600), windowMinutes: 300)
+        #expect(live.percent(at: now) == 42)
+        #expect(UsageWindow(usedPercent: 7, resetsAt: nil, windowMinutes: nil).percent(at: now) == 7)
+    }
+}

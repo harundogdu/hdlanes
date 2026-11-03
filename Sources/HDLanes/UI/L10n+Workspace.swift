@@ -263,10 +263,10 @@ extension L {
 
     // Usage
     static var usageHint: String { pick("Usage appears after the first reply.", "Kullanım ilk cevaptan sonra görünür.") }
-    static var fiveHourShort: String { pick("5h", "5s") }
-    static var weekShort: String { pick("wk", "hf") }
+    static var fiveHourShort: String { pick("5h", "5 sa") }
+    static var weekShort: String { pick("Week", "Hafta") }
     static var noValue: String { "–" }
-    static func percent(_ v: Double) -> String { "\(Int(v.rounded()))%" }
+    static func percent(_ v: Double) -> String { isTurkish ? "%\(Int(v.rounded()))" : "\(Int(v.rounded()))%" }
     static func usageTooltip(account: Account, usage: AccountUsage?, now: Date) -> String {
         var lines = [account.label]
         if let u = usage {
@@ -283,8 +283,9 @@ extension L {
         return lines.joined(separator: "\n")
     }
     private static func windowLine(_ name: String, _ w: UsageWindow, now: Date) -> String {
-        let pct = percent(w.usedPercent)
+        let pct = percent(w.percent(at: now))
         guard let reset = w.resetsAt else { return "\(name): \(pct)" }
+        if w.hasReset(at: now) { return pick("\(name): \(pct) · reset \(relative(reset, now: now))", "\(name): \(pct) · \(relative(reset, now: now)) sıfırlandı") }
         return pick("\(name): \(pct) · resets \(relative(reset, now: now))", "\(name): \(pct) · sıfırlanma \(relative(reset, now: now))")
     }
 }
@@ -403,8 +404,9 @@ extension L {
     }
     static func usageSummary(_ u: AccountUsage) -> String {
         var parts: [String] = []
-        if let w = u.fiveHour { parts.append(pick("5h \(percent(w.usedPercent))", "5 saat \(percent(w.usedPercent))")) }
-        if let w = u.week { parts.append(pick("week \(percent(w.usedPercent))", "hafta \(percent(w.usedPercent))")) }
+        let now = Date()
+        if let w = u.fiveHour { parts.append(pick("5h \(percent(w.percent(at: now)))", "5 saat \(percent(w.percent(at: now)))")) }
+        if let w = u.week { parts.append(pick("week \(percent(w.percent(at: now)))", "hafta \(percent(w.percent(at: now)))")) }
         parts.append(pick("updated \(relative(u.updatedAt))", "güncellendi \(relative(u.updatedAt))"))
         return parts.joined(separator: " · ")
     }

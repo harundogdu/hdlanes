@@ -218,16 +218,19 @@ extension AppModel {
     func stop(_ sessionID: UUID) {
         guard let process = terminals.existingView(for: sessionID)?.process, process.running else { return }
         let shell = process.shellPid
-        let foreground = process.childfd >= 0 ? tcgetpgrp(process.childfd) : -1
-        // An interactive shell ignores SIGTERM; hang up the agent's job and the shell like closing a tab.
-        if foreground > 0, foreground != shell, foreground != getpgrp() { kill(-foreground, SIGHUP) }
-        if shell > 0 { kill(shell, SIGHUP) }
+        // An interactive shell ignores SIGTERM, and the agent runs in its own process group: hang up
+        // the whole terminal session, like closing a tab.
+        ProcessTree.hangUp(session: shell)
         terminals.terminate(sessionID)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             guard let self, let p = self.terminals.existingView(for: sessionID)?.process, p.running, p.shellPid == shell else { return }
-            if foreground > 0, foreground != shell, foreground != getpgrp() { kill(-foreground, SIGKILL) }
-            if shell > 0 { kill(shell, SIGKILL) }
+            ProcessTree.killAll(session: shell)
         }
+    }
+
+    /// Ends every session's processes before the app quits; nothing keeps running without its terminal.
+    func terminateAllSessionsForQuit() {
+        ProcessTree.terminate(sessions: terminals.runningShellPids(), timeout: 1.5)
     }
 
     /// Pastes text into the session's agent; `submit` presses Return.

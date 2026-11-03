@@ -16,14 +16,16 @@ struct AgentsPanel: View {
                                    description: Text(L.agentsEmptyDetail))
         } else {
             let running = snapshot.subagents.filter(\.isRunning).sorted { $0.startedAt > $1.startedAt }
-            let finished = snapshot.subagents.filter { !$0.isRunning }
+            // Finished helpers that never used a tool and had no task text (Claude's internal agents)
+            // are noise; keep everything else.
+            let finished = snapshot.subagents.filter { !$0.isRunning && ($0.toolCount > 0 || $0.description != nil) }
                 .sorted { ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt) }
             let activity = Array(snapshot.activity.suffix(Self.activityLimit).reversed())
             let types = Dictionary(snapshot.subagents.map { ($0.id, $0.type) }, uniquingKeysWith: { a, _ in a })
 
             List {
                 Section(L.subagentsSection) {
-                    if snapshot.subagents.isEmpty {
+                    if running.isEmpty && finished.isEmpty {
                         Text(L.noSubagents)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)

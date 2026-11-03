@@ -15,7 +15,7 @@ struct UsageFooter: View {
         VStack(spacing: 0) {
             if anyUsage {
                 Divider()
-                VStack(spacing: 3) {
+                VStack(spacing: 6) {
                     ForEach(rows) { account in
                         Button { showAccounts = true } label: { UsageRow(account: account) }
                             .buttonStyle(.plain)
@@ -57,13 +57,23 @@ private struct UsageRow: View {
         let usage = model.usage(for: account.id)
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let stale = usage.map { context.date.timeIntervalSince($0.updatedAt) > 15 * 60 } ?? true
-            HStack(spacing: 6) {
-                AccountDot(colorIndex: account.colorIndex, size: 7)
-                Text(account.label)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                meter(L.fiveHourShort, usage?.fiveHour)
-                meter(L.weekShort, usage?.week)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    AccountDot(colorIndex: account.colorIndex, size: 7)
+                    Text(account.label)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if let plan = usage?.plan ?? account.plan {
+                        Text(plan.capitalized)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                HStack(spacing: 10) {
+                    meter(L.fiveHourShort, usage?.fiveHour, now: context.date)
+                    meter(L.weekShort, usage?.week, now: context.date)
+                }
+                .padding(.leading, 13)
             }
             .font(.system(size: 11))
             .opacity(stale ? 0.55 : 1)
@@ -72,15 +82,28 @@ private struct UsageRow: View {
         }
     }
 
-    private func meter(_ label: String, _ window: UsageWindow?) -> some View {
-        HStack(spacing: 3) {
-            Text(label).foregroundStyle(.secondary)
-            UsageMeter(percent: window?.usedPercent, color: Theme.accountColor(account.colorIndex), width: 34)
-            Text(window.map { L.percent($0.usedPercent) } ?? L.noValue)
+    private func meter(_ label: String, _ window: UsageWindow?, now: Date) -> some View {
+        let pct = window?.percent(at: now)
+        return HStack(spacing: 4) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            UsageMeter(percent: pct, color: meterColor(pct), width: nil)
+            Text(pct.map { L.percent($0) } ?? L.noValue)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .trailing)
+                .lineLimit(1)
+                .fixedSize()
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Account color normally; orange from 80 %, red at the limit, so a full window stands out.
+    private func meterColor(_ percent: Double?) -> Color {
+        guard let p = percent else { return Theme.accountColor(account.colorIndex) }
+        if p >= 99.5 { return .red }
+        if p >= 80 { return .orange }
+        return Theme.accountColor(account.colorIndex)
     }
 }
 

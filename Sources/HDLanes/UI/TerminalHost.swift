@@ -38,11 +38,30 @@ final class TerminalContainerView: NSView {
         }
     }
 
+    private var sheetObserver: NSObjectProtocol?
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard let terminal = subviews.first, let window else { return }
-        if window.firstResponder == nil || window.firstResponder === window {
-            window.makeFirstResponder(terminal)
+        if let sheetObserver { NotificationCenter.default.removeObserver(sheetObserver) }
+        sheetObserver = nil
+        guard let window else { return }
+        // A sheet (new session, rename…) takes focus while it is up; give it back to the terminal
+        // when it closes, so typing goes to the agent right away.
+        sheetObserver = NotificationCenter.default.addObserver(forName: NSWindow.didEndSheetNotification,
+                                                               object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.focusTerminal() }
         }
+        if window.firstResponder == nil || window.firstResponder === window {
+            focusTerminal()
+        }
+    }
+
+    private func focusTerminal() {
+        guard let terminal = subviews.first, let window, window.attachedSheet == nil else { return }
+        window.makeFirstResponder(terminal)
+    }
+
+    deinit {
+        if let sheetObserver { NotificationCenter.default.removeObserver(sheetObserver) }
     }
 }

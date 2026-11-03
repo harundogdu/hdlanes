@@ -115,6 +115,7 @@ struct WelcomeView: View {
                 Button(L.newSession) { model.isNewSessionSheetPresented = true }
                 Button(L.accounts) { showAccounts = true }
             }
+            .fixedSize()
         }
         .sheet(isPresented: $showAccounts) { AccountsSheet() }
     }
