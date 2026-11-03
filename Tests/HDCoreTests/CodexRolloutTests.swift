@@ -150,7 +150,10 @@ struct CodexRolloutTests {
     @Test func findsAFileByThreadID() throws {
         let home = try tempDir()
         let day = try dayDir(home, Date(timeIntervalSince1970: 1_700_000_000))
-        let file = try write(day, "rollout-2023-11-14T22-13-20-01A1A089-2838-71b3-b34e-2d37bf48f53e.jsonl", "{}")
+        let old = try write(day, "rollout-2023-11-14T22-13-20-01A1A089-2838-71b3-b34e-2d37bf48f53e.jsonl", "{}")
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-600)], ofItemAtPath: old.path)
+        let laterDay = try dayDir(home, Date(timeIntervalSince1970: 1_700_100_000))
+        let file = try write(laterDay, "rollout-2023-11-16T02-00-00-01a1a089-2838-71b3-b34e-2d37bf48f53e.jsonl", "{}")
         #expect(CodexRollout.findRolloutFile(codexHome: home.path, threadID: "01a1a089-2838-71b3-b34e-2d37bf48f53e")?.path == file.path)
         #expect(CodexRollout.findRolloutFile(codexHome: home.path, threadID: "missing") == nil)
     }

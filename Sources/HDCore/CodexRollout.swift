@@ -284,12 +284,13 @@ public enum CodexRollout {
         return false
     }
 
-    /// The file of an existing thread (for `codex resume`): its name ends with the thread id.
+    /// The file of an existing thread (for `codex resume`): its name ends with the thread id. The most
+    /// recently written one wins, in case a resume ever starts a new file for the same thread.
     public static func findRolloutFile(codexHome: String, threadID: String) -> URL? {
         let suffix = "-\(threadID.lowercased()).jsonl"
-        return allDayDirectories(codexHome: codexHome).lazy
-            .flatMap { rolloutFiles(in: [$0]) }
-            .first { $0.url.lastPathComponent.lowercased().hasSuffix(suffix) }?.url
+        return rolloutFiles(in: allDayDirectories(codexHome: codexHome))
+            .filter { $0.url.lastPathComponent.lowercased().hasSuffix(suffix) }
+            .max { $0.modified < $1.modified }?.url
     }
 
     /// Newest rollout files of a home, newest first (looks at the most recent `maxDays` day folders).

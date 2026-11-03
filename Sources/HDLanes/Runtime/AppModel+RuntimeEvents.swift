@@ -108,15 +108,17 @@ extension AppModel {
         services.watchers.removeValue(forKey: id)?.stop()
         let watcher = RolloutWatcher(sessionID: id, codexHome: CodexRollout.codexHome(for: account, homeDirectory: homeDirectory),
                                      cwd: cwd, launchedAt: Date(), resumeThreadID: resumeThreadID,
-                                     claims: services.rolloutClaims) { [weak self] id, lines in
-            self?.handleRolloutLines(id, lines)
+                                     claims: services.rolloutClaims) { [weak self] watcher, lines in
+            self?.handleRolloutLines(from: watcher, lines)
         }
         services.watchers[id] = watcher
         watcher.start()
     }
 
-    func handleRolloutLines(_ id: UUID, _ lines: [CodexRolloutLine]) {
-        guard runtimeServices.watchers[id] != nil, let session = session(id) else { return }
+    func handleRolloutLines(from watcher: RolloutWatcher, _ lines: [CodexRolloutLine]) {
+        let id = watcher.sessionID
+        // A batch from a watcher replaced by a relaunch belongs to the previous run.
+        guard runtimeServices.watchers[id] === watcher, let session = session(id) else { return }
         let rt = runtime(for: id)
         var snapshot = rt.snapshot
         let now = Date()

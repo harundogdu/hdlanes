@@ -35,7 +35,7 @@ final class RolloutWatcher: @unchecked Sendable {
     private let launchedAt: Date
     private let resumeThreadID: String?
     private let claims: RolloutClaims
-    private let onLines: @MainActor (UUID, [CodexRolloutLine]) -> Void
+    private let onLines: @MainActor (RolloutWatcher, [CodexRolloutLine]) -> Void
 
     private let queue: DispatchQueue
     private var timer: DispatchSourceTimer?
@@ -53,7 +53,7 @@ final class RolloutWatcher: @unchecked Sendable {
     static let maxReadPerTick = 8 << 20
 
     init(sessionID: UUID, codexHome: String, cwd: String, launchedAt: Date, resumeThreadID: String?,
-         claims: RolloutClaims, onLines: @escaping @MainActor (UUID, [CodexRolloutLine]) -> Void) {
+         claims: RolloutClaims, onLines: @escaping @MainActor (RolloutWatcher, [CodexRolloutLine]) -> Void) {
         self.sessionID = sessionID
         self.codexHome = codexHome
         self.cwd = cwd
@@ -130,9 +130,8 @@ final class RolloutWatcher: @unchecked Sendable {
             offset += UInt64(data.count)
             let lines = splitter.append(data).compactMap(CodexRollout.parse(line:))
             guard !lines.isEmpty else { return }
-            let id = sessionID
             let deliver = onLines
-            DispatchQueue.main.async { MainActor.assumeIsolated { deliver(id, lines) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { deliver(self, lines) } }
         } catch {
             return
         }
