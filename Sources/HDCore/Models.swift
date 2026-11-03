@@ -155,6 +155,16 @@ public struct UsageWindow: Codable, Hashable, Sendable {
         self.resetsAt = resetsAt
         self.windowMinutes = windowMinutes
     }
+
+    /// Usage as of `now`: a window whose reset time has passed is empty again, whatever the last reading said.
+    public func percent(at now: Date) -> Double {
+        if let resetsAt, resetsAt <= now { return 0 }
+        return usedPercent
+    }
+
+    public func hasReset(at now: Date) -> Bool {
+        resetsAt.map { $0 <= now } ?? false
+    }
 }
 
 /// Last known usage for an account. Claude: from the status line JSON of any session on that account.

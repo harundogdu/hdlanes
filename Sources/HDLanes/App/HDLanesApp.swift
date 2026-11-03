@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model.saveNow()
+        model.terminateAllSessionsForQuit()
         model.stopRuntimeServices()
     }
 }
