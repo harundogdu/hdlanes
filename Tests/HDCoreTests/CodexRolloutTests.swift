@@ -130,8 +130,9 @@ struct CodexRolloutTests {
         let day = try dayDir(home, now)
         let launchedAt = now.addingTimeInterval(-2)
         let otherFile = try write(day, "rollout-a-0001.jsonl", meta(cwd: other.path))
-        let oldFile = try write(day, "rollout-b-0002.jsonl", meta(cwd: repo.path))
-        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-3600)], ofItemAtPath: oldFile.path)
+        let oldFile = try write(day, "rollout-b-0002.jsonl", meta(cwd: repo.path, started: now.addingTimeInterval(-3600)))
+        try FileManager.default.setAttributes([.creationDate: now.addingTimeInterval(-3600),
+                                               .modificationDate: now.addingTimeInterval(-3600)], ofItemAtPath: oldFile.path)
         let mine = try write(day, "rollout-c-0003.jsonl", meta(cwd: CodexRollout.canonicalPath(repo.path)) + "\n")
         // A sub-agent thread in the same folder, newer than the main one, is skipped.
         let child = meta(cwd: repo.path).replacingOccurrences(of: #""originator""#, with: #""parent_thread_id":"p","originator""#)
@@ -145,6 +146,52 @@ struct CodexRolloutTests {
                                              excluding: [mine.path]) == nil)
         #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: "/nowhere", launchedAt: launchedAt, now: now) == nil)
         #expect(CodexRollout.findRolloutFile(codexHome: "/nonexistent-home", cwd: repo.path, launchedAt: launchedAt) == nil)
+    }
+
+    @Test func anOlderThreadStillBeingWrittenIsNotTheSessionFile() throws {
+        // The user's own Codex in the same folder and home appends to its morning thread right after
+        // hdlanes launched a session that hasn't written its file yet.
+        let home = try tempDir()
+        let repo = try tempDir()
+        let now = Date()
+        let day = try dayDir(home, now)
+        let morning = now.addingTimeInterval(-9 * 3600)
+        let foreign = try write(day, "rollout-2026-11-03T08-00-00-foreign.jsonl", meta(cwd: repo.path, started: morning) + "\n")
+        try FileManager.default.setAttributes([.creationDate: morning, .modificationDate: now], ofItemAtPath: foreign.path)
+        let launchedAt = now.addingTimeInterval(-1)
+        #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: repo.path, launchedAt: launchedAt, now: now) == nil)
+
+        // The session's own file shows up later and is found, even though the foreign one is busier.
+        let mine = try write(day, "rollout-mine.jsonl", meta(cwd: repo.path, started: now) + "\n")
+        try FileManager.default.setAttributes([.creationDate: now, .modificationDate: now.addingTimeInterval(-1)], ofItemAtPath: mine.path)
+        #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: repo.path, launchedAt: launchedAt, now: now)?.path == mine.path)
+    }
+
+    @Test func theEarliestFileAfterLaunchWinsOverABusierLaterOne() throws {
+        let home = try tempDir()
+        let repo = try tempDir()
+        let launchedAt = Date().addingTimeInterval(-30)
+        let day = try dayDir(home, launchedAt)
+        let mine = try write(day, "rollout-z-mine.jsonl", meta(cwd: repo.path, started: launchedAt.addingTimeInterval(2)) + "\n")
+        try FileManager.default.setAttributes([.creationDate: launchedAt.addingTimeInterval(2),
+                                               .modificationDate: launchedAt.addingTimeInterval(3)], ofItemAtPath: mine.path)
+        // Another process started a thread in the same folder later and writes a lot.
+        let later = try write(day, "rollout-a-later.jsonl", meta(cwd: repo.path, started: launchedAt.addingTimeInterval(10)) + "\n")
+        try FileManager.default.setAttributes([.creationDate: launchedAt.addingTimeInterval(10),
+                                               .modificationDate: Date()], ofItemAtPath: later.path)
+        #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: repo.path, launchedAt: launchedAt)?.path == mine.path)
+        #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: repo.path, launchedAt: launchedAt,
+                                             excluding: [mine.path])?.path == later.path)
+    }
+
+    @Test func aNewFileForAnOldThreadIsSkipped() throws {
+        let home = try tempDir()
+        let repo = try tempDir()
+        let now = Date()
+        let day = try dayDir(home, now)
+        // Fresh birth time, but the thread it continues started hours ago.
+        _ = try write(day, "rollout-resumed.jsonl", meta(cwd: repo.path, started: now.addingTimeInterval(-7200)) + "\n")
+        #expect(CodexRollout.findRolloutFile(codexHome: home.path, cwd: repo.path, launchedAt: now.addingTimeInterval(-1), now: now) == nil)
     }
 
     @Test func findsAFileByThreadID() throws {
@@ -216,9 +263,14 @@ struct CodexRolloutTests {
 
     // MARK: Helpers
 
-    private func meta(cwd: String) -> String {
+    /// `Self.meta` for `cwd`, its thread started at `started`.
+    private func meta(cwd: String, started: Date = Date()) -> String {
         let quoted = String(data: try! JSONEncoder().encode(cwd), encoding: .utf8)!
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return Self.meta.replacingOccurrences(of: "\"CWD\"", with: quoted)
+            .replacingOccurrences(of: #""timestamp":"2026-11-03T08:31:46.000Z""#,
+                                  with: #""timestamp":"\#(formatter.string(from: started))""#)
     }
 
     private func tempDir() throws -> URL {

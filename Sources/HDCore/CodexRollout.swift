@@ -255,25 +255,37 @@ public enum CodexRollout {
         return result
     }
 
-    /// The rollout file a freshly launched Codex session writes: the newest `rollout-*.jsonl` modified
-    /// at or after `launchedAt - 5 s` whose `session_meta` cwd is `cwd`. `excluding` holds files other
-    /// sessions already claimed (two sessions in one folder).
+    /// The rollout file a freshly launched Codex session writes: the earliest `rollout-*.jsonl` created
+    /// at or after `launchedAt - 5 s` whose `session_meta` cwd is `cwd` and whose thread started then
+    /// too. Creation time, not modification time: another Codex in the same folder and home keeps
+    /// appending to its older file, and a busier file must not beat the session's own. `excluding`
+    /// holds files other sessions already claimed (two sessions in one folder).
     public static func findRolloutFile(codexHome: String, cwd: String, launchedAt: Date, now: Date = Date(),
                                        excluding: Set<String> = []) -> URL? {
         let want = canonicalPath(cwd)
-        let threshold = launchedAt.addingTimeInterval(-5)
+        let threshold = launchedAt.addingTimeInterval(-launchSlack)
         let candidates = rolloutFiles(in: dayDirectories(codexHome: codexHome, around: [launchedAt, now]))
-            .filter { $0.modified >= threshold && !excluding.contains($0.url.path) }
-            .sorted { $0.modified > $1.modified }
+            .filter { $0.created >= threshold && !excluding.contains($0.url.path) }
+            .sorted { $0.created != $1.created ? $0.created < $1.created : $0.url.path < $1.url.path }
         for candidate in candidates {
             guard let first = readFirstLine(candidate.url),
                   let json = try? JSONDecoder().decode(JSONValue.self, from: first),
                   case .sessionMeta(_, let fileCwd)? = parse(json: json)?.record,
                   let fileCwd, canonicalPath(fileCwd) == want,
                   !isChildThread(meta: json) else { continue }
+            // A new file for an older thread (another process resuming it) isn't this session's.
+            if let started = threadStart(meta: json), started < threshold { continue }
             return candidate.url
         }
         return nil
+    }
+
+    /// How much earlier than hdlanes' own launch time the agent's file may be dated.
+    static let launchSlack: TimeInterval = 5
+
+    /// `session_meta.payload.timestamp`: when the thread itself started (UTC).
+    static func threadStart(meta json: JSONValue) -> Date? {
+        json["payload"]?["timestamp"]?.string.flatMap(parseDate)
     }
 
     /// A sub-agent's thread (its own rollout file, same cwd) is not the session's main thread.
@@ -352,6 +364,8 @@ public enum CodexRollout {
     struct RolloutFile {
         var url: URL
         var modified: Date
+        /// Birth time (APFS); the modification time when the file system doesn't report one.
+        var created: Date
     }
 
     static func rolloutFiles(in dirs: [URL]) -> [RolloutFile] {
@@ -361,8 +375,10 @@ public enum CodexRollout {
             guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { continue }
             for name in names where name.hasPrefix("rollout-") && name.hasSuffix(".jsonl") {
                 let url = dir.appendingPathComponent(name)
-                let modified = (try? fm.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
-                result.append(RolloutFile(url: url, modified: modified))
+                let attributes = try? fm.attributesOfItem(atPath: url.path)
+                let modified = attributes?[.modificationDate] as? Date ?? .distantPast
+                let created = attributes?[.creationDate] as? Date ?? modified
+                result.append(RolloutFile(url: url, modified: modified, created: created))
             }
         }
         return result

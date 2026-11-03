@@ -125,6 +125,65 @@ struct ClaudeEventReducerTests {
         }
     }
 
+    @Test func backgroundAgentPermissionSurvivesTheMainTurnEnding() throws {
+        for boundary in ["Stop", "UserPromptSubmit"] {
+            var h = Harness()
+            h.send("UserPromptSubmit", #""prompt":"x""#)
+            h.send("SubagentStart", #""agent_id":"a1","agent_type":"general-purpose""#)
+            h.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"pnpm install"},"agent_id":"a1","agent_type":"general-purpose""#)
+            #expect(h.s.pendingPermission?.agentID == "a1")
+            h.s.pendingPermission?.canAnswer = true
+            let extra = boundary == "Stop" ? #""last_assistant_message":"Started it","background_tasks":[{"id":"a1","type":"subagent"}]"# : #""prompt":"next""#
+            h.send(boundary, extra)
+            let pending = try #require(h.s.pendingPermission, "\(boundary)")
+            #expect(pending.canAnswer, "\(boundary)")
+            #expect(h.s.status == .needsYou(.permission, detail: "Bash: pnpm install"), "\(boundary)")
+            // Its own tool result (from the same agent) retires it.
+            h.send("PostToolUse", #""tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"pnpm install"},"agent_id":"a1""#)
+            #expect(h.s.pendingPermission == nil, "\(boundary)")
+            #expect(h.s.status == .working, "\(boundary)")
+        }
+    }
+
+    @Test func subagentPermissionNeedsItsOwnAgentsToolResult() {
+        var h = Harness()
+        h.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"ls"},"agent_id":"a1""#)
+        h.send("PostToolUse", #""tool_name":"Bash","tool_use_id":"m","tool_input":{"command":"ls"}"#)
+        #expect(h.s.pendingPermission != nil, "the main agent's own `ls` isn't the subagent's")
+        h.send("PostToolUse", #""tool_name":"Bash","tool_use_id":"s","tool_input":{"command":"ls"},"agent_id":"a2""#)
+        #expect(h.s.pendingPermission != nil)
+    }
+
+    @Test func subagentStopRetiresItsPermission() {
+        var h = Harness()
+        h.send("UserPromptSubmit", #""prompt":"x""#)
+        h.send("SubagentStart", #""agent_id":"a1""#)
+        h.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"make"},"agent_id":"a1""#)
+        h.send("Stop", #""background_tasks":[{"id":"a1","type":"subagent"}]"#)
+        #expect(h.s.status.needsUser)
+        h.send("SubagentStop", #""agent_id":"a1","last_assistant_message":"gave up""#)
+        #expect(h.s.pendingPermission == nil)
+        #expect(h.s.status == .done)
+    }
+
+    @Test func turnEndStillClearsTheMainAgentsAnsweredPermission() {
+        // Answered in the terminal: the hook is gone (canAnswer false) and nothing names a subagent.
+        var h = Harness()
+        h.send("UserPromptSubmit", #""prompt":"x""#)
+        h.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"make"}"#)
+        h.send("Stop", #""background_tasks":[]"#)
+        #expect(h.s.pendingPermission == nil)
+        #expect(h.s.status == .done)
+        // SessionStart and SessionEnd clear a subagent's card too.
+        for clearing in ["SessionStart", "SessionEnd"] {
+            var g = Harness()
+            g.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"make"},"agent_id":"a1""#)
+            g.s.pendingPermission?.canAnswer = true
+            g.send(clearing, clearing == "SessionStart" ? #""source":"startup""# : "")
+            #expect(g.s.pendingPermission == nil, "\(clearing)")
+        }
+    }
+
     @Test func resolvingPermissionResumesWork() {
         var h = Harness()
         h.send("PermissionRequest", #""tool_name":"Bash","tool_input":{"command":"rm -rf build"}"#)
@@ -196,7 +255,7 @@ struct ClaudeEventReducerTests {
         h.send("PostToolUse", #""tool_name":"Agent","tool_use_id":"t1","tool_input":{"description":"bg"}"#)
         h.send("Stop", #""last_assistant_message":"Started it","background_tasks":[{"id":"a1"}]"#)
         #expect(h.s.status == .working)
-        #expect(h.s.backgroundTasks == 1)
+        #expect(h.s.backgroundTasks == 1, "an entry without a type still counts")
         h.send("SubagentStop", #""agent_id":"a1","last_assistant_message":"bg done""#)
         #expect(h.s.backgroundTasks == 0)
         #expect(h.s.status == .done)
@@ -311,10 +370,53 @@ struct ClaudeEventReducerTests {
         #expect(h.s.status == .needsYou(.question, detail: "Which one?"))
         h.osc("working")
         #expect(h.s.status == .working)
-        // Non-authoritative idle/error leave a working session to the hooks.
-        h.osc("idle")
+        // Non-authoritative done/error leave a working session to the hooks (Stop / StopFailure follow).
+        h.osc("done")
         #expect(h.s.status == .working)
         h.osc("error", nil, "x")
+        #expect(h.s.status == .working)
+        // idle mid-turn means the turn ended without completing (Esc): no Stop will come.
+        h.osc("idle")
+        #expect(h.s.status == .ready)
+        #expect(!h.reducer.turnActive)
+    }
+
+    @Test func escInterruptedTurnIsNotLeftWorking() {
+        var h = Harness()
+        let stamp = ClaudeHookPayload.stampKey
+        h.send("UserPromptSubmit", #""prompt":"x""#)
+        h.send("PreToolUse", #""tool_name":"Bash","tool_use_id":"b1","tool_input":{"command":"sleep 100"}"#)
+        h.osc("working")
+        h.osc("idle")
+        #expect(h.s.status == .ready)
+        #expect(h.s.activity.first { $0.id == "b1" }?.isRunning == false)
+        // The interrupted tool's failure hook started before the OSC arrived: it doesn't revive the turn.
+        let before = (h.clock.timeIntervalSince1970 - 0.5) * 1000
+        h.send("PostToolUseFailure", #""tool_name":"Bash","tool_use_id":"b1","tool_input":{"command":"sleep 100"},"is_interrupt":true,"\#(stamp)":\#(before)"#)
+        #expect(h.s.status == .ready)
+        // A new prompt works as usual.
+        h.send("UserPromptSubmit", #""prompt":"y""#)
+        #expect(h.s.status == .working)
+    }
+
+    @Test func oscIdleDoesNotEndATurnThatIsWaitingOnSomething() {
+        var h = Harness()
+        h.send("UserPromptSubmit", #""prompt":"x""#)
+        h.send("Stop", #""background_tasks":[{"id":"a1","type":"subagent"}]"#)
+        // Turn over, a background agent works on: idle must not mark it ready.
+        h.osc("idle")
+        #expect(h.s.status == .working)
+    }
+
+    @Test func stopWithOnlyShellsAndMonitorsIsDone() {
+        var h = Harness()
+        h.send("UserPromptSubmit", #""prompt":"x""#)
+        h.send("Stop", #""background_tasks":[{"id":"b1","type":"shell","command":"npm run dev"},{"id":"m1","type":"monitor"},{"id":"t1","type":"MCP task"}]"#)
+        #expect(h.s.backgroundTasks == 0)
+        #expect(h.s.status == .done)
+        h.send("UserPromptSubmit", #""prompt":"y""#)
+        h.send("Stop", #""background_tasks":[{"id":"b1","type":"shell"},{"id":"a2","type":"subagent"},{"id":"w1","type":"workflow"},{"id":"u"}]"#)
+        #expect(h.s.backgroundTasks == 3)
         #expect(h.s.status == .working)
     }
 
