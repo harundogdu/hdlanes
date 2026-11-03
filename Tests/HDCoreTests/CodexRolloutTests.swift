@@ -133,6 +133,10 @@ struct CodexRolloutTests {
         let oldFile = try write(day, "rollout-b-0002.jsonl", meta(cwd: repo.path))
         try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-3600)], ofItemAtPath: oldFile.path)
         let mine = try write(day, "rollout-c-0003.jsonl", meta(cwd: CodexRollout.canonicalPath(repo.path)) + "\n")
+        // A sub-agent thread in the same folder, newer than the main one, is skipped.
+        let child = meta(cwd: repo.path).replacingOccurrences(of: #""originator""#, with: #""parent_thread_id":"p","originator""#)
+        let childFile = try write(day, "rollout-d-0004.jsonl", child)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(1)], ofItemAtPath: childFile.path)
         _ = otherFile
 
         let found = CodexRollout.findRolloutFile(codexHome: home.path, cwd: link.path, launchedAt: launchedAt, now: now)

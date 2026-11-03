@@ -267,11 +267,21 @@ public enum CodexRollout {
             .sorted { $0.modified > $1.modified }
         for candidate in candidates {
             guard let first = readFirstLine(candidate.url),
-                  case .sessionMeta(_, let fileCwd)? = parse(line: first)?.record,
-                  let fileCwd, canonicalPath(fileCwd) == want else { continue }
+                  let json = try? JSONDecoder().decode(JSONValue.self, from: first),
+                  case .sessionMeta(_, let fileCwd)? = parse(json: json)?.record,
+                  let fileCwd, canonicalPath(fileCwd) == want,
+                  !isChildThread(meta: json) else { continue }
             return candidate.url
         }
         return nil
+    }
+
+    /// A sub-agent's thread (its own rollout file, same cwd) is not the session's main thread.
+    static func isChildThread(meta json: JSONValue) -> Bool {
+        let payload = json["payload"]
+        if let parent = payload?["parent_thread_id"]?.string, !parent.isEmpty { return true }
+        if case .object? = payload?["source"] { return true }
+        return false
     }
 
     /// The file of an existing thread (for `codex resume`): its name ends with the thread id.
