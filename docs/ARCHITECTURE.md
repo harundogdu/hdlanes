@@ -327,12 +327,19 @@ only on click.
 `HDCore/CrossCheck.swift` (pure, tested), `Git/AppModel+CrossCheck.swift`, `Git/L10n+CrossCheck.swift`,
 the "Check with…" menu in the Changes footer. On click only: the diff is refreshed and rendered per file
 with `N<new line>` / `O<old line>` prefixes (cut at 120 000 characters, the prompt says so), then one
-`claude -p --output-format json --model sonnet --no-session-persistence --tools "" --disable-slash-commands`
-runs on the chosen Claude account (accounts other than the session's own are listed first) with the
-prompt on stdin, cwd `run/cli/`. No tools: the reviewer sees only the diff and can't touch the worktree.
+`claude -p` with `CrossCheck.claudeArguments` (`--output-format json --model sonnet
+--no-session-persistence --tools "" --disallowedTools "mcp__*" --strict-mcp-config --mcp-config
+'{"mcpServers":{}}' --disable-slash-commands`) runs on the chosen Claude account (accounts other than the
+session's own are listed first) with the prompt on stdin, cwd `run/cli/`. `--tools ""` alone removes only
+built-in tools: user-scope and plugin MCP servers would still load (8 did on a test account), so MCP is
+shut off too. Verified with `--output-format stream-json --verbose`: the `init` event lists no tools, MCP
+servers, skills or slash commands. The diff is untrusted, so the checker only reads what it is given and
+the prompt tells it to ignore instructions inside the diff.
 The reply is a JSON array `{file, line, removedLine, note}` (first array in the text, fences tolerated).
-Each finding is anchored to the diff (exact path, else a unique path suffix; a line not in the diff
-becomes a file-level note; an unknown file keeps the given path) and added as a `ReviewNote` prefixed
+Each finding is anchored to the snapshot that was sent (exact path, else a unique path suffix; a line
+not in the diff becomes a file-level note; an unknown file becomes a file-level note on the first file
+with the path in its text, so nothing is sent unseen; line numbers that aren't positive integers are
+dropped) and added as a `ReviewNote` prefixed
 with `[<account label>]`, so the user edits or deletes it and sends the notes to the session's agent the
 usual way. Works for Claude and Codex sessions; the checker is always a Claude account. Verified live
 with claude 2.1.318: `--tools ""` + stdin prompt → one turn, JSON array reply.

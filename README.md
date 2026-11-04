@@ -45,7 +45,7 @@ log out of anything.
   base branch. Leave notes on lines and send them to the agent as one message, or push the branch and open
   a pull request with `gh`.
 - **Check with another account.** In the **Changes** tab, **Check with…** has another Claude account read
-  the diff once (no tools, so it can't touch your files) and adds what it finds as notes on the lines.
+  the diff once (no tools and no MCP servers, so it can't touch your files) and adds what it finds as notes on the lines.
   Edit or delete them, then send them to the session's agent like your own notes. It runs only when you
   click and uses that account's quota.
 - **Browser.** The **Browser** tab opens the dev server URLs a session prints (`localhost:3000` and the

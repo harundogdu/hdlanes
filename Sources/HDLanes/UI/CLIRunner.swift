@@ -98,15 +98,6 @@ enum CLIRunner {
             return CLIResult(status: -1, stdout: "", stderr: error.localizedDescription, launchFailed: true)
         }
 
-        if let inPipe, let stdin {
-            let writer = inPipe.fileHandleForWriting
-            // If the child exits without reading (e.g. the CLI isn't installed), report EPIPE instead
-            // of raising SIGPIPE, which would kill the app. Per-fd, so terminal children keep the default.
-            _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
-            try? writer.write(contentsOf: stdin)
-            try? writer.close()
-        }
-
         let pid = process.processIdentifier
         let killer = DispatchWorkItem {
             guard process.isRunning else { return }
@@ -117,6 +108,17 @@ enum CLIRunner {
             }
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
+
+        // After the timeout is armed: a large stdin blocks until the child reads it.
+        if let inPipe, let stdin {
+            let writer = inPipe.fileHandleForWriting
+            // If the child exits without reading (e.g. the CLI isn't installed), report EPIPE instead
+            // of raising SIGPIPE, which would kill the app. Per-fd, so terminal children keep the default.
+            _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
+            try? writer.write(contentsOf: stdin)
+            try? writer.close()
+        }
+
         process.waitUntilExit()
         killer.cancel()
 

@@ -35,9 +35,7 @@ extension AppModel {
         let diff = CrossCheck.renderDiff(files)
         let prompt = CrossCheck.prompt(title: session.title, diff: diff.text, truncated: diff.truncated,
                                        language: L.isTurkish ? "Turkish" : "English")
-        // The diff goes in on stdin (it can be large); no tools, so the reviewer only reads what it is given.
-        let args = ["-p", "--output-format", "json", "--model", "sonnet", "--no-session-persistence",
-                    "--tools", "", "--disable-slash-commands"]
+        let args = CrossCheck.claudeArguments
         let result = await runAccountCLI(account, arguments: args, stdin: Data(prompt.utf8), timeout: 300)
         let outcome: CrossCheckState
         if result.launchFailed || AccountCLI.isCommandNotFound(status: result.status, output: result.combined) {
@@ -45,8 +43,8 @@ extension AppModel {
         } else if result.timedOut {
             outcome = .failed(WorkspaceError.timedOut.errorDescription ?? L.crossCheckFailed)
         } else if let text = ClaudePrintOutput.result(from: result.stdout), let findings = CrossCheck.parseFindings(text) {
-            let current = diffs[sessionID]?.files ?? files
-            for a in CrossCheck.anchor(findings, in: current) {
+            // Anchor on the snapshot that was sent (its line numbers); later refreshes relocate the notes.
+            for a in CrossCheck.anchor(findings, in: files) {
                 addReviewNote(ReviewNote(filePath: a.filePath, line: a.newLine, lineText: a.lineText,
                                          text: "[\(account.label)] \(a.note)", oldLine: a.oldLine), to: sessionID)
             }

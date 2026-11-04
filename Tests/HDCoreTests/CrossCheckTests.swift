@@ -61,7 +61,22 @@ struct CrossCheckTests {
         #expect(anchors[0] == .init(filePath: "src/a.swift", newLine: 2, oldLine: nil, lineText: "let b = 3", note: "n1"))
         #expect(anchors[1] == .init(filePath: "src/a.swift", newLine: nil, oldLine: 2, lineText: "let b = 2", note: "n2"))
         #expect(anchors[2] == .init(filePath: "lib/b.swift", newLine: nil, oldLine: nil, lineText: "", note: "n3"))
-        #expect(anchors[3] == .init(filePath: "gone.swift", newLine: nil, oldLine: nil, lineText: "", note: "n4"))
+        #expect(anchors[3] == .init(filePath: "src/a.swift", newLine: nil, oldLine: nil, lineText: "", note: "(gone.swift) n4"))
+        #expect(CrossCheck.anchor([.init(file: "a", line: 1, note: "x")], in: []).isEmpty)
+    }
+
+    @Test func hostileLineNumbersDontTrap() {
+        let reply = #"[{"file":"a","line":1e19,"note":"a"},{"file":"a","line":"nan","note":"b"},{"file":"a","line":-3,"note":"c"},{"file":"a","line":"7","note":"d"},{"file":"a","line":2.5,"note":"e"}]"#
+        let lines = CrossCheck.parseFindings(reply)?.map(\.line)
+        #expect(lines == [nil, nil, nil, 7, 3])
+    }
+
+    @Test func checkerRunsWithoutToolsOrMCP() {
+        let args = CrossCheck.claudeArguments
+        #expect(args.contains("--strict-mcp-config"))
+        #expect(args.firstIndex(of: "--disallowedTools").map { args[$0 + 1] } == "mcp__*")
+        #expect(args.firstIndex(of: "--tools").map { args[$0 + 1] } == "")
+        #expect(args.firstIndex(of: "--mcp-config").map { args[$0 + 1] } == #"{"mcpServers":{}}"#)
     }
 
     @Test func emptyToolsArgumentSurvivesQuoting() {
