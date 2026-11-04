@@ -63,4 +63,9 @@ struct CrossCheckTests {
         #expect(anchors[2] == .init(filePath: "lib/b.swift", newLine: nil, oldLine: nil, lineText: "", note: "n3"))
         #expect(anchors[3] == .init(filePath: "gone.swift", newLine: nil, oldLine: nil, lineText: "", note: "n4"))
     }
+
+    @Test func emptyToolsArgumentSurvivesQuoting() {
+        let line = AccountCLI.commandLine(provider: .claude, configDir: nil, arguments: ["-p", "--tools", "", "--disable-slash-commands"])
+        #expect(line.hasSuffix("claude '-p' '--tools' '' '--disable-slash-commands'"))
+    }
 }

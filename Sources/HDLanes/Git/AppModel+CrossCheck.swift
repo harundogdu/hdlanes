@@ -23,6 +23,10 @@ extension AppModel {
         if case .running = crossChecks[sessionID] { return }
         crossChecks[sessionID] = .running(account: account.label)
         await refreshDiff(sessionID)
+        // A refresh already in flight returns at once; wait for it so the diff isn't stale or empty.
+        for _ in 0..<150 where diffs[sessionID]?.isRefreshing == true {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
         let files = diffs[sessionID]?.files ?? []
         guard !files.isEmpty else {
             crossChecks[sessionID] = .failed(L.crossCheckNoChanges)
