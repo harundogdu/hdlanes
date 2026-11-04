@@ -221,6 +221,7 @@ struct ChangesFooter: View {
             }
             .disabled(sendProblem != nil)
             .help(sendProblem ?? L.sendNotesHelp)
+            CrossCheckControl(sessionID: sessionID)
             Spacer(minLength: 4)
             if let url = model.diffs[sessionID]?.pullRequestURL {
                 Button {
@@ -247,6 +248,41 @@ struct ChangesFooter: View {
         }) {
             PullRequestSheet(sessionID: sessionID)
                 .environment(model)
+        }
+    }
+}
+
+/// "Check with…" menu of Claude accounts and the last run's state.
+struct CrossCheckControl: View {
+    let sessionID: UUID
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let accounts = model.crossCheckAccounts(for: sessionID)
+        let own = model.session(sessionID)?.accountID
+        let state = model.crossChecks[sessionID]
+        let running: Bool = { if case .running = state { return true } else { return false } }()
+        Menu(L.crossCheckButton) {
+            ForEach(accounts) { account in
+                Button(L.crossCheckWith(account.label, own: account.id == own)) {
+                    Task { await model.runCrossCheck(sessionID: sessionID, accountID: account.id) }
+                }
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(accounts.isEmpty || running)
+        .help(accounts.isEmpty ? L.crossCheckNoAccount : L.crossCheckHelp)
+        switch state {
+        case .running(let label):
+            ProgressView().controlSize(.mini)
+            Text(L.crossCheckRunning(label)).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+        case .done(let label, let n):
+            Text(L.crossCheckDone(label, n)).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+        case .failed(let message):
+            Text(message).font(.system(size: 11)).foregroundStyle(.red).lineLimit(1).help(message)
+        case nil:
+            EmptyView()
         }
     }
 }

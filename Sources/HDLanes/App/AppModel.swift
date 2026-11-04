@@ -78,6 +78,8 @@ final class AppModel {
     // Git area (Git/)
     var diffs: [UUID: SessionDiff] = [:]
     var reviewNotes: [UUID: [ReviewNote]] = [:]
+    /// "Check with another account" per session: running, last result or error.
+    var crossChecks: [UUID: CrossCheckState] = [:]
 
     // Workspace area (UI/)
     var accountHealth: [UUID: AccountHealth] = [:]
