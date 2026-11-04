@@ -223,6 +223,8 @@ public struct AppState: Codable, Sendable {
     /// Keyed by `Account.id.uuidString` (String keys keep the JSON an object).
     public var usage: [String: AccountUsage]
     public var settings: AppSettings
+    /// Tokens, MCP servers and kubeconfigs handed to sessions (secrets are in the Keychain).
+    public var connections: [Connection]
 
     public init() {
         version = Self.currentVersion
@@ -232,9 +234,10 @@ public struct AppState: Codable, Sendable {
         tasks = []
         usage = [:]
         settings = AppSettings()
+        connections = []
     }
 
-    enum CodingKeys: String, CodingKey { case version, accounts, projects, sessions, tasks, usage, settings }
+    enum CodingKeys: String, CodingKey { case version, accounts, projects, sessions, tasks, usage, settings, connections }
 
     // Tolerant decoding: a missing collection is empty, never a load failure.
     public init(from decoder: Decoder) throws {
@@ -246,5 +249,6 @@ public struct AppState: Codable, Sendable {
         tasks = try c.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? []
         usage = try c.decodeIfPresent([String: AccountUsage].self, forKey: .usage) ?? [:]
         settings = try c.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
+        connections = try c.decodeIfPresent([Connection].self, forKey: .connections) ?? []
     }
 }

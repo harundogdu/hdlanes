@@ -48,6 +48,12 @@ log out of anything.
   the diff once (no tools and no MCP servers, so it can't touch your files) and adds what it finds as notes on the lines.
   Edit or delete them, then send them to the session's agent like your own notes. It runs only when you
   click and uses that account's quota.
+- **Connections.** Settings › Connections keeps tokens, MCP servers and kubeconfigs for your sessions,
+  for all projects or only some. Secrets stay in your Keychain and reach a session only as environment
+  variables, never on its command line. Claude sessions also get the MCP servers (a local command or a
+  URL with the token in a header). Codex and shell sessions get the variables. For a cluster, give a
+  read-only kubeconfig if the agents should only look. A variable your shell profile exports itself
+  (for example `export KUBECONFIG=…` in `.zshrc`) wins over the connection's.
 - **Browser.** The **Browser** tab opens the dev server URLs a session prints (`localhost:3000` and the
   like) next to its terminal.
 - **Usage meters.** Each account shows how much of its 5-hour and weekly limits it has used, taken from
@@ -95,7 +101,9 @@ account's folder (anything the account already has of its own is left alone), an
 pointed at the default account's (`autoMemoryDirectory`), so what one account learns about a repository
 the others read too. Logins, settings and history stay separate. You can turn this off per account in
 Settings › Accounts. For an imported folder it is off by default, and turning it on shares only project
-memory: hdlanes doesn't add links to a folder it didn't create.
+memory: hdlanes doesn't add links to a folder it didn't create. While sharing is on, a memory folder the
+account built up on its own (`<account>/projects/…/memory`) is left on disk but not read, and an
+`autoMemoryDirectory` in the account's own `settings.json` is overridden; turn sharing off to use them.
 
 When hdlanes starts an agent it also unsets credential variables your shell profile might export
 (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, …), so they can't override the

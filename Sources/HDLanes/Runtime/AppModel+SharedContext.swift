@@ -23,7 +23,7 @@ extension AppModel {
               let source = SharedContext.defaultSourceDir(for: account.provider, homeDirectory: homeDirectory)
         else { return [] }
         if sharesDefaultContext(account) {
-            prepareAccountDir(dir)
+            prepareAccountDir(dir)  // no-op when it exists; needed at account creation and app start
             return SharedContext.sync(accountDir: dir, sourceDir: source, provider: account.provider)
         }
         SharedContext.unlink(accountDir: dir, sourceDir: source, provider: account.provider)
@@ -52,6 +52,8 @@ extension AppModel {
                                                             repositoryRoot: SharedContext.repositoryRoot(for: cwd))
         else { return nil }
         // Claude doesn't create a custom memory dir at startup; make sure the first write has a folder.
+        // Never creates ~/.claude itself: without a default account there is nothing to share.
+        guard FileManager.default.fileExists(atPath: source) else { return nil }
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         return dir
     }

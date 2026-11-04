@@ -49,6 +49,7 @@ accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700);
                                    prompts may be symlinks into ~/.codex
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json
 run/hd.sock                        hook socket (run/ is 0700)
+run/sessions/<uuid>/mcp.json       per-session --mcp-config of the session's MCP connections (0600, no secrets)
 run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline,
                                    autoMemoryDirectory for a managed account that shares context)
 run/cli/                           empty cwd of account CLI calls and the login terminal
@@ -217,6 +218,32 @@ its newest rollout file's last `token_count` (passive, no token use).
 Needs-you for Codex: terminal title / OSC 7501 `blocked` (title containing "Action Required" or
 "approval"). There are no Codex hooks in v0.1.
 
+## Connections (runtime + workspace areas)
+
+`HDCore/Connections.swift` (model, validation, environment and MCP config builders; tested),
+`Runtime/ConnectionSecrets.swift`, `Runtime/AppModel+Connections.swift`, `UI/ConnectionsView.swift`
+(Settings › Connections). `AppState.connections` holds metadata only: name, kind, variable, command and
+arguments or URL and header, kubeconfig path, project scope (nil/empty = all projects), on/off.
+
+- **Secrets** are Keychain generic passwords: service `hdlanes.connections.<first 4 bytes of
+  sha256(hdlanes home path)>`, account = connection id. A test home (`HDLANES_HOME`) has its own
+  service and never sees the real app's items. Secrets are never logged or written to state.json.
+- **Kinds.** `token`: the secret as `<VARIABLE>`. `mcpCommand`: Claude starts `command args…`, with
+  `env: {VAR: "${VAR}"}` when there is a secret. `mcpURL`: `{"type":"http","url",headers:{<header>:
+  "<prefix>${VAR}"}}`. `kubeconfig`: `KUBECONFIG=<path>`; read-only is a property of the credentials in
+  that file, which the UI says.
+- **At launch** the applying connections' variables go into the PTY environment (after the
+  `baseEnvironment` allowlist), never into the pasted command line (scrollback, shell history, `ps`).
+  Claude sessions also get `--mcp-config run/sessions/<id>/mcp.json`, rewritten on every launch (removed
+  when empty). claude 2.1.318 loads `--mcp-config` files with variable expansion on (`expandVars:!0`
+  for both files and inline JSON), so the file holds `${VAR}` references only. Codex sessions and plain
+  shells get the variables but no MCP servers. A session restarted in its open terminal keeps the
+  variables it started with; MCP changes apply on the next launch.
+- **Reserved names** can't be used (validated on save and filtered again at launch): anything with the
+  `CLAUDE`, `ANTHROPIC_`, `CODEX_`, `OPENAI_`, `TMUX`, `HD_`, `LC_` prefixes, the strip and provider-switch
+  lists, the PTY allowlist (`PATH`, `HOME`, `SHELL`, …) and terminal variables. `KUBECONFIG` only through
+  the kubeconfig kind. One variable per connection.
+
 ## Import (workspace area)
 
 `HDCore/ImportScanner.swift` (pure, file-system reads only, every root a parameter, tested with temp
@@ -349,7 +376,7 @@ with claude 2.1.318: `--tools ""` + stdin prompt → one turn, JSON array reply.
 | Area | Files | Contract |
 |---|---|---|
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
-| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
+| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext,Connections}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |

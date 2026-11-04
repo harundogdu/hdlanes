@@ -128,6 +128,8 @@ public enum EnvBuilder {
         /// nil when the hook binary wasn't found: the agent then runs without hdlanes' hooks.
         public var pluginDir: String?
         public var settingsPath: String?
+        /// Claude: per-session `--mcp-config` file of the session's MCP connections.
+        public var mcpConfigPath: String? = nil
         /// Raw shell command run before the agent (project setup in a fresh worktree).
         public var setupCommand: String?
         /// Printed when the setup command fails; the agent starts anyway.
@@ -158,6 +160,7 @@ public enum EnvBuilder {
             parts.append("claude")
             if let dir = launch.pluginDir { parts.append("--plugin-dir \(ShellQuote.quote(dir))") }
             if let settings = launch.settingsPath { parts.append("--settings \(ShellQuote.quote(settings))") }
+            if let mcp = launch.mcpConfigPath { parts.append("--mcp-config \(ShellQuote.quote(mcp))") }
             if let id = launch.agentSessionID, !id.isEmpty {
                 parts.append("\(launch.resume ? "--resume" : "--session-id") \(ShellQuote.quote(id))")
             }
@@ -224,10 +227,14 @@ public enum EnvBuilder {
     /// The terminal itself carries the managed account's dir variable, so a `claude` / `codex` typed in
     /// the shell left after the agent exits runs as the same account. The agent prefix still unsets and
     /// sets it again. Empty for the system default account (see `accountVariables`).
+    ///
+    /// `connections` (tokens, KUBECONFIG) go into the terminal's environment only, never into the
+    /// command line, which is visible in the terminal and in `ps`. Reserved names are dropped.
     public static func launchSpec(_ launch: AgentLaunch, session: SessionVariables, cwd: String,
-                                  processEnv: [String: String]) -> LaunchSpec {
-        guard launch.provider.isAgent else { return shellSpec(cwd: cwd, processEnv: processEnv) }
+                                  processEnv: [String: String], connections: [String: String] = [:]) -> LaunchSpec {
+        guard launch.provider.isAgent else { return shellSpec(cwd: cwd, processEnv: processEnv, connections: connections) }
         var env = baseEnvironment(processEnv)
+        addConnections(connections, to: &env)
         for (key, value) in accountVariables(launch.account) { env[key] = value }
         for (key, value) in session.environment { env[key] = value }
         let script = agentCommand(launch) + "; " + keepShell(processEnv)
@@ -235,8 +242,15 @@ public enum EnvBuilder {
                           environment: env, cwd: cwd)
     }
 
-    public static func shellSpec(cwd: String, processEnv: [String: String]) -> LaunchSpec {
-        LaunchSpec(executable: userShell(processEnv), args: ["-l", "-i"], environment: baseEnvironment(processEnv), cwd: cwd)
+    public static func shellSpec(cwd: String, processEnv: [String: String], connections: [String: String] = [:]) -> LaunchSpec {
+        var env = baseEnvironment(processEnv)
+        addConnections(connections, to: &env)
+        return LaunchSpec(executable: userShell(processEnv), args: ["-l", "-i"], environment: env, cwd: cwd)
+    }
+
+    /// Connection variables, minus any name that would touch a login, a provider or hdlanes' wiring.
+    static func addConnections(_ connections: [String: String], to env: inout [String: String]) {
+        for (key, value) in connections where key == "KUBECONFIG" || !ConnectionRules.isReserved(key) { env[key] = value }
     }
 
     /// `exec '<shell>' -l -i`: replaces the command shell with an interactive one after the agent exits.

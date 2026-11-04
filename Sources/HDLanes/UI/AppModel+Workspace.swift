@@ -40,6 +40,7 @@ enum WorkspaceError: LocalizedError, Equatable {
     case aiDisabled
     case aiUnreadable
     case invalidBranch(String)
+    case connection(ConnectionRules.Problem)
 
     var errorDescription: String? {
         switch self {
@@ -55,6 +56,7 @@ enum WorkspaceError: LocalizedError, Equatable {
         case .aiDisabled: return L.errAIDisabled
         case .aiUnreadable: return L.errAIUnreadable
         case .invalidBranch(let problem): return problem
+        case .connection(let problem): return L.connectionProblem(problem)
         }
     }
 }
