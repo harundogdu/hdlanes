@@ -3,6 +3,9 @@ import HDCore
 
 // OWNER: workspace area. Strings of Settings › Connections.
 extension L {
+    static func keychainError(_ status: Int32) -> String {
+        pick("Keychain error \(status).", "Keychain hatası \(status).")
+    }
     static var connectionsTab: String { pick("Connections", "Bağlantılar") }
     static var connectionsFooter: String {
         pick("Tokens, MCP servers and kubeconfigs given to new sessions. Secrets stay in your Keychain and reach a session only as environment variables.",
@@ -89,6 +92,9 @@ extension L {
                         "Bu değişken ayrılmış: oturumun girişini, sağlayıcısını ya da hdlanes'in kendi bağlantılarını değiştirir.")
         case .duplicateVariable:
             return pick("Another connection already uses this variable.", "Bu değişkeni başka bir bağlantı kullanıyor.")
+        case .duplicateServerName:
+            return pick("Another MCP connection has a name that gives the same server name. Rename one.",
+                        "Başka bir MCP bağlantısının adı aynı sunucu adını veriyor. Birini yeniden adlandır.")
         case .missingCommand: return pick("Enter the command that starts the server.", "Sunucuyu başlatan komutu gir.")
         case .invalidURL: return pick("Enter an http or https URL.", "http ya da https URL'si gir.")
         case .missingFile: return pick("Choose the kubeconfig file.", "Kubeconfig dosyasını seç.")

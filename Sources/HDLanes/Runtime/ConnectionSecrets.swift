@@ -58,6 +58,6 @@ struct ConnectionSecrets {
 struct KeychainError: LocalizedError {
     var status: OSStatus
     var errorDescription: String? {
-        (SecCopyErrorMessageString(status, nil) as String?) ?? "Keychain error \(status)"
+        (SecCopyErrorMessageString(status, nil) as String?) ?? L.keychainError(status)
     }
 }

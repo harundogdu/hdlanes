@@ -34,6 +34,12 @@ struct ConnectionsTests {
         let other = Connection(name: "o", kind: .token, variable: "T")
         #expect(problem(Connection(name: "x", kind: .token, variable: "T"), [other]) == .duplicateVariable)
         #expect(problem(other, [other]) == nil)
+        let p1Only = Connection(name: "o1", kind: .token, variable: "T", projectIDs: [p1])
+        #expect(problem(Connection(name: "x", kind: .token, variable: "T", projectIDs: [p2]), [p1Only]) == nil)
+        #expect(problem(Connection(name: "x", kind: .token, variable: "T", projectIDs: [p1, p2]), [p1Only]) == .duplicateVariable)
+        let jira = Connection(name: "Jira!", kind: .mcpURL, variable: "J1", url: "https://a.example/mcp")
+        #expect(problem(Connection(name: "Jira?", kind: .mcpURL, variable: "J2", url: "https://b.example/mcp"), [jira]) == .duplicateServerName)
+        #expect(ConnectionRules.isReserved("NODE_OPTIONS") && ConnectionRules.isReserved("DYLD_INSERT_LIBRARIES"))
     }
 
     @Test func environmentFollowsScopeAndSkipsMissingSecrets() {

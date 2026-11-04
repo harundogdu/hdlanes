@@ -39,6 +39,11 @@ extension AppModel {
         return ConnectionRules.environment(state.connections, projectID: session.projectID) { secrets.read($0.id) }
     }
 
+    func existingMCPConfig(for session: AgentSession) -> String? {
+        let path = paths.sessionRunDir(session.id).appendingPathComponent("mcp.json").path
+        return FileManager.default.fileExists(atPath: path) ? path : nil
+    }
+
     /// Writes `run/sessions/<id>/mcp.json` (no secrets, `${VAR}` references) and returns its path, or
     /// removes a stale one and returns nil when the session gets no MCP connection.
     func writeMCPConfig(for session: AgentSession) -> String? {

@@ -201,7 +201,10 @@ extension AppModel {
             }
         }
 
-        let mcpConfig = session.provider == .claude ? writeMCPConfig(for: session) : nil
+        // Restarted in its open shell, the agent has the variables the terminal started with: keep the
+        // MCP file it was started with too, so no new `${VAR}` lacks its value.
+        let mcpConfig = session.provider == .claude
+            ? (shellAlive ? existingMCPConfig(for: session) : writeMCPConfig(for: session)) : nil
         var agentLaunch = EnvBuilder.AgentLaunch(
             provider: session.provider, account: account, title: session.title, agentSessionID: agentSessionID,
             resume: resumeAgent, initialPrompt: firstLaunch ? session.initialPrompt : nil, pluginDir: pluginDir,

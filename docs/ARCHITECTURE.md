@@ -241,8 +241,11 @@ arguments or URL and header, kubeconfig path, project scope (nil/empty = all pro
   variables it started with; MCP changes apply on the next launch.
 - **Reserved names** can't be used (validated on save and filtered again at launch): anything with the
   `CLAUDE`, `ANTHROPIC_`, `CODEX_`, `OPENAI_`, `TMUX`, `HD_`, `LC_` prefixes, the strip and provider-switch
-  lists, the PTY allowlist (`PATH`, `HOME`, `SHELL`, …) and terminal variables. `KUBECONFIG` only through
-  the kubeconfig kind. One variable per connection.
+  lists, the PTY allowlist (`PATH`, `HOME`, `SHELL`, …), terminal variables, `DYLD_*`/`LD_*`,
+  `NODE_OPTIONS` and the proxy variables. `KUBECONFIG` only through the kubeconfig kind. Two connections
+  may share a variable (or an MCP server name) only when no project gets both. A session restarted in
+  its open shell reuses the MCP file it started with, so it never references a variable its terminal
+  lacks. The MCP header prefix is stored as typed (`Bearer ` is only the default for a new URL server).
 
 ## Import (workspace area)
 

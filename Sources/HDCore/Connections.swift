@@ -65,6 +65,8 @@ public enum ConnectionRules {
         /// Would change which account or provider a session uses, or hdlanes' own wiring.
         case reservedVariable
         case duplicateVariable
+        /// Another MCP connection would get the same server name.
+        case duplicateServerName
         case missingCommand
         case invalidURL
         case missingFile
@@ -76,7 +78,8 @@ public enum ConnectionRules {
         let upper = name.uppercased()
         if EnvBuilder.droppedPrefixes.contains(where: { upper.hasPrefix($0) }) { return true }
         if upper.hasPrefix("HD_") { return true }
-        let fixed = Set(EnvBuilder.claudeStripVariables + EnvBuilder.claudeProviderSwitchVariables
+        if ["DYLD_", "LD_"].contains(where: { upper.hasPrefix($0) }) { return true }
+        let fixed = Set(["NODE_OPTIONS", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"] + EnvBuilder.claudeStripVariables + EnvBuilder.claudeProviderSwitchVariables
                         + EnvBuilder.codexStripVariables + Array(EnvBuilder.allowedKeys)
                         + Array(EnvBuilder.terminalVariables.keys) + ["LC_ALL", "LC_CTYPE", "PWD", "OLDPWD"])
         return fixed.contains(upper) || upper.hasPrefix("LC_")
@@ -88,7 +91,13 @@ public enum ConnectionRules {
         guard let first = v.unicodeScalars.first, v.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "_") }),
               !CharacterSet.decimalDigits.contains(first) else { return .invalidVariable }
         if c.kind == .kubeconfig ? v != "KUBECONFIG" : isReserved(v) || v == "KUBECONFIG" { return .reservedVariable }
-        if others.contains(where: { $0.id != c.id && $0.variable == v }) { return .duplicateVariable }
+        // Two connections may share a variable only when no project gets both.
+        if others.contains(where: { $0.id != c.id && $0.variable == v && overlaps($0, c) }) { return .duplicateVariable }
+        if c.kind == .mcpCommand || c.kind == .mcpURL,
+           others.contains(where: { $0.id != c.id && ($0.kind == .mcpCommand || $0.kind == .mcpURL)
+                                    && serverName($0) == serverName(c) && overlaps($0, c) }) {
+            return .duplicateServerName
+        }
         switch c.kind {
         case .token: break
         case .mcpCommand:
@@ -100,6 +109,12 @@ public enum ConnectionRules {
             if (c.filePath ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return .missingFile }
         }
         return nil
+    }
+
+    /// Whether some project would get both connections.
+    static func overlaps(_ a: Connection, _ b: Connection) -> Bool {
+        guard let x = a.projectIDs, !x.isEmpty, let y = b.projectIDs, !y.isEmpty else { return true }
+        return !Set(x).isDisjoint(with: y)
     }
 
     /// Variables a session in `projectID` gets: each applying connection's secret (or kubeconfig path)

@@ -45,6 +45,8 @@ private struct ConnectionRow: View {
     let edit: () -> Void
     @Environment(AppModel.self) private var model
     @State private var confirmRemove = false
+    /// Read once per appearance and change, not on every render (each read is a Keychain query).
+    @State private var secretSaved = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -74,6 +76,7 @@ private struct ConnectionRow: View {
             .controlSize(.small)
         }
         .padding(.vertical, 2)
+        .task(id: connection) { secretSaved = model.connectionHasSecret(connection) }
         .confirmationDialog(L.removeConnectionTitle(connection.name), isPresented: $confirmRemove, titleVisibility: .visible) {
             Button(L.remove, role: .destructive) { model.removeConnection(connection.id) }
             Button(L.cancel, role: .cancel) {}
@@ -92,7 +95,7 @@ private struct ConnectionRow: View {
         }
         if connection.hasSecret {
             parts.append("$" + connection.variable)
-            parts.append(L.connectionSecretState(model.connectionHasSecret(connection)))
+            parts.append(L.connectionSecretState(secretSaved))
         }
         parts.append(L.connectionScope(connection.projectIDs?.count))
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
@@ -162,6 +165,13 @@ private struct ConnectionEditor: View {
         .padding(16)
         .frame(width: 520, height: 560)
         .onAppear { hadSecret = !isNew && model.connectionHasSecret(original) }
+        .onChange(of: draft.kind) { _, kind in
+            // The usual header for a token; an empty prefix (e.g. `X-API-Key`) is kept as typed.
+            if kind == .mcpURL, draft.headerName == nil, draft.headerPrefix == nil {
+                draft.headerName = "Authorization"
+                draft.headerPrefix = "Bearer "
+            }
+        }
     }
 
     @ViewBuilder private var kindFields: some View {
@@ -169,18 +179,18 @@ private struct ConnectionEditor: View {
         case .token:
             EmptyView()
         case .mcpCommand:
-            TextField(L.connectionCommand, text: optional(\.command), prompt: Text("npx"))
+            TextField(L.connectionCommand, text: optional(\.command), prompt: Text(verbatim: "npx"))
                 .font(.system(size: 12, design: .monospaced))
-            TextField(L.connectionArguments, text: $argumentsText, prompt: Text("-y @scope/server"))
+            TextField(L.connectionArguments, text: $argumentsText, prompt: Text(verbatim: "-y @scope/server"))
                 .font(.system(size: 12, design: .monospaced))
         case .mcpURL:
-            TextField(L.connectionURL, text: optional(\.url), prompt: Text("https://example.com/mcp"))
+            TextField(L.connectionURL, text: optional(\.url), prompt: Text(verbatim: "https://example.com/mcp"))
                 .font(.system(size: 12, design: .monospaced))
-            TextField(L.connectionHeader, text: optional(\.headerName), prompt: Text("Authorization"))
-            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: Text("Bearer "))
+            TextField(L.connectionHeader, text: optional(\.headerName), prompt: Text(verbatim: "Authorization"))
+            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: Text(verbatim: "Bearer "))
         case .kubeconfig:
             HStack {
-                TextField(L.connectionFile, text: optional(\.filePath), prompt: Text("~/.kube/readonly.yaml"))
+                TextField(L.connectionFile, text: optional(\.filePath), prompt: Text(verbatim: "~/.kube/readonly.yaml"))
                     .font(.system(size: 12, design: .monospaced))
                 Button(L.chooseFileEllipsis, action: chooseFile)
             }
@@ -229,7 +239,6 @@ private struct ConnectionEditor: View {
         if c.kind != .mcpCommand { c.command = nil }
         if c.kind != .mcpURL { c.url = nil; c.headerName = nil; c.headerPrefix = nil }
         if c.kind == .mcpURL, (c.headerName ?? "").isEmpty { c.headerName = "Authorization" }
-        if c.kind == .mcpURL, c.headerPrefix == nil { c.headerPrefix = "Bearer " }
         if c.kind != .kubeconfig { c.filePath = nil }
         return c
     }
