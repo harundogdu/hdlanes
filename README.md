@@ -28,7 +28,8 @@ log out of anything.
   edit the same files. Per project you can set the worktree folder, a setup command (for example
   `npm ci`) and gitignored files to copy in (for example `.env`).
 - **Several accounts at once.** Add as many Claude and Codex accounts as you like and pick one per session.
-  See [How accounts work](#how-accounts-work).
+  Every account sees the skills, agents, commands and project memory of your default account, so
+  switching accounts doesn't mean starting from scratch. See [How accounts work](#how-accounts-work).
 - **Import what you already have.** File › Import… (⇧⌘I) finds account folders you already use from the
   terminal or an editor (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` in VS Code, Cursor or Windsurf settings and in
   your shell profile, or `~/.claude-*` / `~/.codex-*` folders) and adds them without a new login. It also
@@ -82,6 +83,15 @@ accounts. hdlanes starts those **without** setting the variable. Claude Code sto
 entry under a name derived from the exact config dir string, so setting `CLAUDE_CONFIG_DIR=~/.claude`
 would make your existing login look logged out. For the same reason a managed account's folder path is
 fixed once and never changes.
+
+**Shared context.** An account hdlanes creates sees what your default account has: for Claude the
+`skills/`, `agents/`, `commands/` folders and `CLAUDE.md` of `~/.claude`, and the project's memory; for
+Codex `AGENTS.md`, `skills/`, `agents/` and `prompts/` of `~/.codex`. The folders are symlinked into the
+account's folder (anything the account already has of its own is left alone), and project memory is
+pointed at the default account's (`autoMemoryDirectory`), so what one account learns about a repository
+the others read too. Logins, settings and history stay separate. You can turn this off per account in
+Settings › Accounts. For an imported folder it is off by default, and turning it on shares only project
+memory: hdlanes doesn't add links to a folder it didn't create.
 
 When hdlanes starts an agent it also unsets credential variables your shell profile might export
 (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, …), so they can't override the

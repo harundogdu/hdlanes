@@ -110,6 +110,8 @@ private struct AccountRow: View {
                     Text(L.systemAccountNote(account.provider))
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
+                } else if account.provider == .claude || model.canLinkSharedContext(account) {
+                    SharedContextControl(account: account)
                 }
                 if let error {
                     Text(error)
@@ -162,6 +164,44 @@ private struct AccountRow: View {
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+}
+
+/// The "use the default account's skills, agents, … and memory" switch with what is linked now.
+private struct SharedContextControl: View {
+    let account: Account
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let on = model.sharesDefaultContext(account)
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(L.shareDefaultContext(account.provider), isOn: Binding(
+                get: { on },
+                set: { model.setSharesDefaultContext(account.id, $0) }))
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .font(.system(size: 11))
+                .help(L.shareDefaultContextHelp(account.provider))
+            if on {
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private var lines: [String] {
+        guard model.canLinkSharedContext(account) else { return [L.sharedMemoryOnly] }
+        let status = model.sharedContextStatus(for: account)
+        func names(_ state: SharedContext.LinkState) -> [String] { status.filter { $0.state == state }.map(\.name) }
+        var out: [String] = []
+        if !names(.linked).isEmpty { out.append(L.sharedLinked(names(.linked))) }
+        if !names(.notLinked).isEmpty { out.append(L.sharedPending(names(.notLinked))) }
+        if !names(.occupied).isEmpty { out.append(L.sharedOwn(names(.occupied))) }
+        return out
     }
 }
 

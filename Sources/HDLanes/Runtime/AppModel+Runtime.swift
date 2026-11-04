@@ -53,6 +53,7 @@ extension AppModel {
             show(error: error, title: L.hookServerFailedTitle)
         }
         refreshClaudePlugin()
+        for account in state.accounts where canLinkSharedContext(account) { syncSharedContext(for: account) }
         startHookServer()
         seedCodexUsage()
         captureLoginPath()
@@ -149,6 +150,7 @@ extension AppModel {
             }
             // CODEX_HOME must exist; creating a missing Claude dir only means "logged out".
             prepareAccountDir(dir)
+            syncSharedContext(for: account)
         }
 
         // Initial prompt and setup command belong to the very first launch only.
@@ -185,10 +187,15 @@ extension AppModel {
         var settingsPath: String?
         var chain: String?
         let services = runtimeServices
-        if session.provider == .claude, services.pluginInstalled, let hook = services.hookPath {
-            pluginDir = HDPaths.normalizedDirString(paths.claudePluginDir.path)
-            settingsPath = try? PluginInstaller.writeSessionSettings(paths: paths, sessionID: sessionID, hookPath: hook)
-            if settingsPath != nil {
+        if session.provider == .claude {
+            let hook = services.pluginInstalled ? services.hookPath : nil
+            let memory = account.flatMap { sharedMemoryDirectory(for: $0, cwd: session.cwd) }
+            if hook != nil { pluginDir = HDPaths.normalizedDirString(paths.claudePluginDir.path) }
+            if hook != nil || memory != nil {
+                settingsPath = try? PluginInstaller.writeSessionSettings(paths: paths, sessionID: sessionID,
+                                                                        hookPath: hook, autoMemoryDirectory: memory)
+            }
+            if settingsPath != nil, hook != nil {
                 chain = PluginInstaller.userStatusLineCommand(for: account, homeDirectory: homeDirectory)
             }
         }

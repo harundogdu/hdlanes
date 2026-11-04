@@ -43,11 +43,14 @@ SwiftTerm (keep terminal code in AppKit-only files), or qualify `SwiftUI.Color`.
 ```
 state.json                         AppState (accounts, projects, sessions, tasks, usage, settings)
 state.backup-<ts>.json             state.json that failed to decode, preserved
-accounts/claude/<uuid>/            CLAUDE_CONFIG_DIR of a managed Claude account (0700)
-accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700)
+accounts/claude/<uuid>/            CLAUDE_CONFIG_DIR of a managed Claude account (0700); skills, agents,
+                                   commands, CLAUDE.md may be symlinks into ~/.claude (shared context)
+accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700); AGENTS.md, skills, agents,
+                                   prompts may be symlinks into ~/.codex
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json
 run/hd.sock                        hook socket (run/ is 0700)
-run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline)
+run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline,
+                                   autoMemoryDirectory for a managed account that shares context)
 run/cli/                           empty cwd of account CLI calls and the login terminal
 ```
 
@@ -99,6 +102,37 @@ terminal run with cwd `run/cli/` (empty, hdlanes-owned), never `$HOME`: Claude C
 own file (an `apiKeyHelper` there made every managed account look logged in with an API key).
 
 Shell quoting: single-quote every interpolated value (`'` → `'\''`).
+
+## Shared context (runtime area)
+
+A managed account is a separate config dir, so on its own it sees none of the default account's
+skills, agents, commands, global instructions or project memory. `HDCore/SharedContext.swift` (pure,
+tested with temp dirs) and `Runtime/AppModel+SharedContext.swift` share them. Per account
+`Account.sharesDefaultContext`; nil means on for dirs under `accounts/`, off for imported folders.
+
+**Links.** Claude: `CLAUDE.md skills agents commands` from `~/.claude`; Codex: `AGENTS.md skills agents
+prompts` from `~/.codex` (Codex reads `$CODEX_HOME/skills` and `agents/`). Each entry is one symlink
+with an absolute target (`~/.claude/skills` holds relative symlinks that only resolve through the real
+folder). Only in dirs hdlanes created (`isInsideAccountsDir`). An entry the account already has (a file,
+a folder, a symlink elsewhere) is never replaced; a link of ours whose target vanished is removed; a
+source created later is linked next time. Synced at app start, at account creation, on every launch of
+a session on that account, and when the setting changes (off removes only our links). Never linked:
+`settings.json`, `.claude.json`, `config.toml`, `auth.json`, plugins, history. Because the links are
+whole folders, a skill installed from a managed account lands in the default account's folder.
+
+**Memory** (Claude, verified with claude 2.1.318). Auto memory lives in
+`<config>/projects/<key>/memory/`, where `<key>` is the repository's main working tree (a linked
+worktree resolves to its main repository; symlinks resolved; the folder itself outside git) with every
+character outside `[a-zA-Z0-9]` turned into `-`. Claude reads `autoMemoryDirectory` from policy, flag
+(`--settings`), local, project (not honored there) and user settings, in that order, and uses the value as
+the memory dir itself. So a managed account's session `--settings` gets
+`"autoMemoryDirectory": "~/.claude/projects/<key>/memory"` (absolute), and both accounts read and write
+the same `MEMORY.md`. Claude doesn't create a custom memory dir at startup, so hdlanes creates it
+(`mkdir -p`) before the launch. Keys longer than 200 characters get a hash suffix in Claude Code that hdlanes
+doesn't reproduce; those projects don't share memory. The settings file is written when there is a
+hook or a memory dir, so memory sharing doesn't depend on the hook binary. Live check: `/context all` in
+a managed-account session lists `<that dir>/MEMORY.md` under Memory files and the linked agents/skills
+under User.
 
 ## Claude Code observation (verified with claude 2.1.317)
 
@@ -293,7 +327,7 @@ only on click.
 | Area | Files | Contract |
 |---|---|---|
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
-| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
+| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |

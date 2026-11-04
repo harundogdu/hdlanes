@@ -38,6 +38,9 @@ public struct Account: Identifiable, Codable, Hashable, Sendable {
     public var email: String?
     public var plan: String?
     public var createdAt: Date
+    /// Use the default account's skills, agents, commands, global instructions and project memory.
+    /// nil → on for folders hdlanes created, off for imported ones (see `SharedContext`).
+    public var sharesDefaultContext: Bool?
 
     public init(id: UUID = UUID(), provider: Provider, label: String, colorIndex: Int, isSystemDefault: Bool,
                 configDir: String?, authMethod: AuthMethod, email: String? = nil, plan: String? = nil,

@@ -366,6 +366,18 @@ struct EnvBuilderTests {
         let settings = try JSONDecoder().decode(JSONValue.self, from: ClaudePluginFiles.sessionSettingsJSON(hookPath: "/b/hdlanes-hook"))
         #expect(settings.path("statusLine.type")?.string == "command")
         #expect(settings.path("statusLine.command")?.string == "'/b/hdlanes-hook' statusline")
+        #expect(settings.path("autoMemoryDirectory") == nil)
+    }
+
+    @Test func sessionSettingsCarryTheSharedMemoryDirWithOrWithoutTheHook() throws {
+        let both = try JSONDecoder().decode(JSONValue.self, from: ClaudePluginFiles.sessionSettingsJSON(
+            hookPath: "/b/hdlanes-hook", autoMemoryDirectory: "/Users/u/.claude/projects/-r/memory"))
+        #expect(both.path("autoMemoryDirectory")?.string == "/Users/u/.claude/projects/-r/memory")
+        #expect(both.path("statusLine.command") != nil)
+        let memoryOnly = try JSONDecoder().decode(JSONValue.self, from: ClaudePluginFiles.sessionSettingsJSON(
+            hookPath: nil, autoMemoryDirectory: "/m"))
+        #expect(memoryOnly.path("autoMemoryDirectory")?.string == "/m")
+        #expect(memoryOnly.path("statusLine") == nil)
     }
 
     @Test func userStatusLineCommandIsChainedOnlyWhenItIsAnotherCommand() {

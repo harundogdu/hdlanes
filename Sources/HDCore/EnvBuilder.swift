@@ -339,12 +339,18 @@ public enum ClaudePluginFiles {
         return .array([.object(entry)])
     }
 
-    /// Per-session `--settings`: the status line goes through the hook.
-    public static func sessionSettingsJSON(hookPath: String) -> Data {
-        encode(.object(["statusLine": .object([
-            "type": .string("command"),
-            "command": .string(hookCommand(hookPath: hookPath, argument: "statusline")),
-        ])]))
+    /// Per-session `--settings`: the status line goes through the hook (when there is one), and a
+    /// managed account shares the default account's auto memory (`autoMemoryDirectory`).
+    public static func sessionSettingsJSON(hookPath: String?, autoMemoryDirectory: String? = nil) -> Data {
+        var root: [String: JSONValue] = [:]
+        if let hookPath {
+            root["statusLine"] = .object([
+                "type": .string("command"),
+                "command": .string(hookCommand(hookPath: hookPath, argument: "statusline")),
+            ])
+        }
+        if let autoMemoryDirectory { root["autoMemoryDirectory"] = .string(autoMemoryDirectory) }
+        return encode(.object(root))
     }
 
     /// The user's own `statusLine.command` from an account's settings.json, to chain behind ours.
