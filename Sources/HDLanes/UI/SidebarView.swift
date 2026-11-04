@@ -29,6 +29,8 @@ struct SidebarView: View {
         List(selection: $model.selection) {
             TrackingSidebarRow()
                 .tag(SidebarSelection.tracking)
+            InboxSidebarRow()
+                .tag(SidebarSelection.inbox)
             BoardRow()
                 .tag(SidebarSelection.board)
             ForEach(sections) { section in
