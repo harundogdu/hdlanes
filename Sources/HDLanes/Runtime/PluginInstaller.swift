@@ -28,12 +28,15 @@ enum PluginInstaller {
             .write(to: hooksDir.appendingPathComponent("hooks.json"), options: .atomic)
     }
 
-    /// `run/sessions/<id>/settings.json` with the status line wrapper; returns its path.
-    static func writeSessionSettings(paths: HDPaths, sessionID: UUID, hookPath: String) throws -> String {
+    /// `run/sessions/<id>/settings.json` with the status line wrapper and the shared memory dir;
+    /// returns its path.
+    static func writeSessionSettings(paths: HDPaths, sessionID: UUID, hookPath: String?,
+                                     autoMemoryDirectory: String?) throws -> String {
         let dir = paths.sessionRunDir(sessionID)
         try HDPaths.ensurePrivateDir(dir)
         let file = dir.appendingPathComponent("settings.json")
-        try ClaudePluginFiles.sessionSettingsJSON(hookPath: hookPath).write(to: file, options: .atomic)
+        try ClaudePluginFiles.sessionSettingsJSON(hookPath: hookPath, autoMemoryDirectory: autoMemoryDirectory)
+            .write(to: file, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         return file.path
     }

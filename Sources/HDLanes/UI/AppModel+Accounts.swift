@@ -32,6 +32,7 @@ extension AppModel {
                               colorIndex: nextAccountColorIndex(), isSystemDefault: false, configDir: dir,
                               authMethod: method)
         state.accounts.append(account)
+        syncSharedContext(for: account)
         return account
     }
 
