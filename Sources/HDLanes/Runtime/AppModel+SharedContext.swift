@@ -48,7 +48,11 @@ extension AppModel {
     func sharedMemoryDirectory(for account: Account, cwd: String) -> String? {
         guard account.provider == .claude, sharesDefaultContext(account),
               let source = SharedContext.defaultSourceDir(for: .claude, homeDirectory: homeDirectory) else { return nil }
-        return SharedContext.claudeMemoryDirectory(sourceDir: source,
-                                                   repositoryRoot: SharedContext.repositoryRoot(for: cwd))
+        guard let dir = SharedContext.claudeMemoryDirectory(sourceDir: source,
+                                                            repositoryRoot: SharedContext.repositoryRoot(for: cwd))
+        else { return nil }
+        // Claude doesn't create a custom memory dir at startup; make sure the first write has a folder.
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        return dir
     }
 }

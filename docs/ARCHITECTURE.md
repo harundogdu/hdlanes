@@ -127,7 +127,8 @@ character outside `[a-zA-Z0-9]` turned into `-`. Claude reads `autoMemoryDirecto
 (`--settings`), local, project (not honored there) and user settings, in that order, and uses the value as
 the memory dir itself. So a managed account's session `--settings` gets
 `"autoMemoryDirectory": "~/.claude/projects/<key>/memory"` (absolute), and both accounts read and write
-the same `MEMORY.md`. Keys longer than 200 characters get a hash suffix in Claude Code that hdlanes
+the same `MEMORY.md`. Claude doesn't create a custom memory dir at startup, so hdlanes creates it
+(`mkdir -p`) before the launch. Keys longer than 200 characters get a hash suffix in Claude Code that hdlanes
 doesn't reproduce; those projects don't share memory. The settings file is written when there is a
 hook or a memory dir, so memory sharing doesn't depend on the hook binary. Live check: `/context all` in
 a managed-account session lists `<that dir>/MEMORY.md` under Memory files and the linked agents/skills
@@ -326,7 +327,7 @@ only on click.
 | Area | Files | Contract |
 |---|---|---|
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
-| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
+| runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
