@@ -187,7 +187,7 @@ private struct ConnectionEditor: View {
             TextField(L.connectionURL, text: optional(\.url), prompt: Text(verbatim: "https://example.com/mcp"))
                 .font(.system(size: 12, design: .monospaced))
             TextField(L.connectionHeader, text: optional(\.headerName), prompt: Text(verbatim: "Authorization"))
-            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: Text(verbatim: ""))
+            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: nil)
         case .kubeconfig:
             HStack {
                 TextField(L.connectionFile, text: optional(\.filePath), prompt: Text(verbatim: "~/.kube/readonly.yaml"))

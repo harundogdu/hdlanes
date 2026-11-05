@@ -7,8 +7,11 @@ import SwiftUI
 /// (`HDLANES_HOME=/tmp/…`). Off unless the variable is set.
 @MainActor
 enum DevSnapshot {
+    /// Only with a test home too: the tour must never run against the user's real state.
     static var directory: URL? {
-        ProcessInfo.processInfo.environment["HDLANES_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let env = ProcessInfo.processInfo.environment
+        guard env["HDLANES_HOME"]?.isEmpty == false else { return nil }
+        return env["HDLANES_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 
     static func runIfRequested(model: AppModel) {
