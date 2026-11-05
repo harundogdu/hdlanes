@@ -225,11 +225,9 @@ func runChain(_ command: String, input: Data, environment: [String: String]) -> 
     return box.value
 }
 
-func defaultStatusLine(_ payload: JSONValue) -> Data {
-    var parts: [String] = []
-    if let model = payload.path("model.display_name")?.string, !model.isEmpty { parts.append(model) }
-    if let percent = UsageParser.contextPercent(fromStatusLine: payload) { parts.append("ctx \(Int(percent.rounded()))%") }
-    return parts.isEmpty ? Data() : Data((parts.joined(separator: " · ") + "\n").utf8)
+func defaultStatusLine(_ payload: JSONValue, accountLabel: String?) -> Data {
+    let line = StatusLine.render(payload, accountLabel: accountLabel)
+    return line.isEmpty ? Data() : Data((line + "\n").utf8)
 }
 
 // MARK: Main
@@ -252,7 +250,7 @@ if event == "statusline" {
     if let chain = environment[HookEnv.statusLineChain], !chain.trimmingCharacters(in: .whitespaces).isEmpty {
         printOut(runChain(chain, input: input, environment: environment))
     } else {
-        printOut(defaultStatusLine(payload))
+        printOut(defaultStatusLine(payload, accountLabel: environment[HookEnv.accountLabel]))
     }
     exit(0)
 }

@@ -184,7 +184,9 @@ The hook receives JSON on stdin with `rate_limits.five_hour.used_percentage`, `r
 (epoch s), `rate_limits.seven_day.*`, `context_window.used_percentage`, `cost.total_cost_usd`,
 `session_id`, `model.display_name`. It forwards it (event `StatusLine`) and, if `HD_STATUSLINE_CHAIN` is
 set (the account's own `statusLine.command`), pipes the same JSON to that command and prints its output;
-otherwise prints a short line (model · ctx %). Must return fast (<200 ms) and never fail loudly.
+otherwise prints `HDCore/StatusLine`: account label (`HD_ACCOUNT_LABEL`, control characters stripped,
+≤24 chars) · model · ctx % · 5h % · 7d %, percentages green / yellow (≥60) / red (≥85), with the reset
+time once a window is ≥80 % used. Must return fast (<200 ms) and never fail loudly.
 
 **OSC 7501** (claude ≥ 2.1.295): SwiftTerm calls `programStatusChanged(records:)` with
 `state ∈ idle|working|done|blocked|error`, `kind ∈ permission|question|auth`. Use as a second, instant

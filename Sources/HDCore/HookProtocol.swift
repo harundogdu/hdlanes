@@ -50,6 +50,8 @@ public enum HookEnv {
     public static let account = "HD_ACCOUNT_ID"
     /// The user's own status line command for this account, chained by `hdlanes-hook statusline`.
     public static let statusLineChain = "HD_STATUSLINE_CHAIN"
+    /// The account's label, shown in hdlanes' own status line.
+    public static let accountLabel = "HD_ACCOUNT_LABEL"
 }
 
 /// Arbitrary JSON, so hook payloads pass through without a schema.
