@@ -134,7 +134,8 @@ extension AppModel {
         guard session.provider.isAgent else {
             guard !shellAlive else { return }
             rt.snapshot = AgentRuntimeSnapshot(status: .notStarted)
-            terminals.start(sessionID, spec: EnvBuilder.shellSpec(cwd: session.cwd, processEnv: processEnv))
+            terminals.start(sessionID, spec: EnvBuilder.shellSpec(cwd: session.cwd, processEnv: processEnv,
+                                                                  connections: connectionEnvironment(for: session)))
             return
         }
 
@@ -200,10 +201,15 @@ extension AppModel {
             }
         }
 
-        let agentLaunch = EnvBuilder.AgentLaunch(
+        // Restarted in its open shell, the agent has the variables the terminal started with: keep the
+        // MCP file it was started with too, so no new `${VAR}` lacks its value.
+        let mcpConfig = session.provider == .claude
+            ? (shellAlive ? existingMCPConfig(for: session) : writeMCPConfig(for: session)) : nil
+        var agentLaunch = EnvBuilder.AgentLaunch(
             provider: session.provider, account: account, title: session.title, agentSessionID: agentSessionID,
             resume: resumeAgent, initialPrompt: firstLaunch ? session.initialPrompt : nil, pluginDir: pluginDir,
             settingsPath: settingsPath, setupCommand: setup, setupFailedNotice: L.setupCommandFailed)
+        agentLaunch.mcpConfigPath = mcpConfig
 
         resetLiveState(sessionID, agentSessionID: agentSessionID)
         if shellAlive {
@@ -217,7 +223,8 @@ extension AppModel {
             let vars = EnvBuilder.SessionVariables(socketPath: paths.socketPath, sessionID: sessionID,
                                                    accountID: account?.id, statusLineChain: chain)
             terminals.start(sessionID, spec: EnvBuilder.launchSpec(agentLaunch, session: vars, cwd: session.cwd,
-                                                                   processEnv: processEnv))
+                                                                   processEnv: processEnv,
+                                                                   connections: connectionEnvironment(for: session)))
         }
         if session.provider == .claude, let agentSessionID, session.agentSessionID != agentSessionID {
             updateSession(sessionID) { $0.agentSessionID = agentSessionID }

@@ -13,6 +13,9 @@ struct SettingsView: View {
             AccountsView()
                 .tabItem { Label(L.accounts, systemImage: "person.2") }
                 .tag("accounts")
+            ConnectionsView()
+                .tabItem { Label(L.connectionsTab, systemImage: "key") }
+                .tag("connections")
             TaskSettings()
                 .tabItem { Label(L.tasksTab, systemImage: "checklist") }
                 .tag("tasks")
