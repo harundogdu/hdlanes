@@ -4,11 +4,11 @@ import Foundation
 extension L {
     static var crossCheckButton: String { pick("Check with…", "Kontrol ettir…") }
     static var crossCheckHelp: String {
-        pick("Another Claude account reads this diff once (claude -p, no tools, uses that account's quota) and adds its findings as notes you can edit and send.",
-             "Başka bir Claude hesabı bu diff'i bir kez okur (claude -p, araçsız, o hesabın kotasını kullanır) ve bulduklarını düzenleyip gönderebileceğin notlar olarak ekler.")
+        pick("Another Claude or Codex account reads this diff once (claude -p or codex exec, no tools, uses that account's quota) and adds its findings as notes you can edit and send.",
+             "Başka bir Claude ya da Codex hesabı bu diff'i bir kez okur (claude -p ya da codex exec, araçsız, o hesabın kotasını kullanır) ve bulduklarını düzenleyip gönderebileceğin notlar olarak ekler.")
     }
     static var crossCheckNoAccount: String {
-        pick("Add a Claude account to check with", "Kontrol için bir Claude hesabı ekle")
+        pick("Add a Claude or Codex account to check with", "Kontrol için bir Claude ya da Codex hesabı ekle")
     }
     static func crossCheckWith(_ label: String, own: Bool) -> String {
         own ? pick("\(label) (this session's account)", "\(label) (bu oturumun hesabı)") : label

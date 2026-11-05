@@ -374,8 +374,16 @@ not in the diff becomes a file-level note; an unknown file becomes a file-level 
 with the path in its text, so nothing is sent unseen; line numbers that aren't positive integers are
 dropped) and added as a `ReviewNote` prefixed
 with `[<account label>]`, so the user edits or deletes it and sends the notes to the session's agent the
-usual way. Works for Claude and Codex sessions; the checker is always a Claude account. Verified live
-with claude 2.1.318: `--tools ""` + stdin prompt → one turn, JSON array reply.
+usual way. Works for Claude and Codex sessions. Verified live with claude 2.1.318: `--tools ""` + stdin
+prompt → one turn, JSON array reply.
+
+A Codex account can be the checker too: `codex exec` with `CrossCheck.codexArguments` (`--sandbox
+read-only --skip-git-repo-check --ephemeral --ignore-user-config --ignore-rules --color never --json`,
+`--disable` for shell_tool, unified_exec, apps, plugins, multi_agent, image_generation, browser_use,
+computer_use, view_image, hooks, goals, `-c web_search="disabled"`, prompt on stdin via `-`). Verified
+with codex 0.166.0: asked to run `ls /` it answers that it has no tool; the real prompt with a small diff
+returns the JSON array. `HDCore/CodexExecOutput` reads the JSONL: the last `item.completed` agent
+message is the reply; an `error` / `turn.failed` event gives the message shown on failure.
 
 ## Inbox (inbox area)
 

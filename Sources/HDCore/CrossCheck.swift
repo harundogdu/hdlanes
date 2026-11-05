@@ -13,6 +13,19 @@ public enum CrossCheck {
         "--disable-slash-commands",
     ]
 
+    /// `codex exec` flags, verified with codex 0.166.0: read-only sandbox (no writes, no network), no user
+    /// config.toml (so no MCP servers, profiles or hooks), no execpolicy rules, nothing saved, and every
+    /// tool feature off — asked to run `ls /`, it answers that it has no tool. JSONL events on stdout;
+    /// the prompt goes in on stdin (`-`).
+    public static let codexArguments = [
+        "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+        "--ignore-rules", "--color", "never", "--json",
+        "--disable", "shell_tool", "--disable", "unified_exec", "--disable", "apps", "--disable", "plugins",
+        "--disable", "multi_agent", "--disable", "image_generation", "--disable", "browser_use",
+        "--disable", "computer_use", "--disable", "view_image", "--disable", "hooks", "--disable", "goals",
+        "-c", #"web_search="disabled""#, "-",
+    ]
+
     /// Characters of diff text sent at most; the rest is cut and the prompt says so.
     public static let defaultDiffLimit = 120_000
 
