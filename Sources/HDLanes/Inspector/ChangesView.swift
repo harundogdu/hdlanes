@@ -67,24 +67,14 @@ struct ChangesView: View {
     private func content(_ diff: SessionDiff?) -> some View {
         if let diff, diff.hasLoaded {
             if !diff.isRepository {
-                ContentUnavailableView(L.notRepositoryTitle, systemImage: "folder.badge.questionmark",
-                                       description: Text(L.notRepositoryDetail))
+                CompactEmptyState(title: L.notRepositoryTitle, symbol: "folder.badge.questionmark",
+                                  detail: L.notRepositoryDetail)
             } else if let error = diff.error, diff.files.isEmpty {
-                ContentUnavailableView {
-                    Label(L.changesErrorTitle, systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(verbatim: error)
-                } actions: {
-                    Button(L.tryAgain) { Task { await model.refreshDiff(sessionID) } }
-                }
+                CompactEmptyState(title: L.changesErrorTitle, symbol: "exclamationmark.triangle", detail: error,
+                                  actionTitle: L.tryAgain) { Task { await model.refreshDiff(sessionID) } }
             } else if diff.files.isEmpty {
-                ContentUnavailableView {
-                    Label(L.noChangesTitle, systemImage: "checkmark.circle")
-                } description: {
-                    Text(L.noChangesDetail)
-                } actions: {
-                    Button(L.refresh) { Task { await model.refreshDiff(sessionID) } }
-                }
+                CompactEmptyState(title: L.noChangesTitle, symbol: "checkmark.circle", detail: L.noChangesDetail,
+                                  actionTitle: L.refresh) { Task { await model.refreshDiff(sessionID) } }
             } else {
                 VStack(spacing: 0) {
                     if let error = diff.error {

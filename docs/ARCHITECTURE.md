@@ -234,8 +234,8 @@ arguments or URL and header, kubeconfig path, project scope (nil/empty = all pro
   that file, which the UI says.
 - **At launch** the applying connections' variables go into the PTY environment (after the
   `baseEnvironment` allowlist), never into the pasted command line (scrollback, shell history, `ps`).
-  Claude sessions also get `--mcp-config run/sessions/<id>/mcp.json`, rewritten on every launch (removed
-  when empty). claude 2.1.318 loads `--mcp-config` files with variable expansion on (`expandVars:!0`
+  Claude sessions also get `--mcp-config run/sessions/<id>/mcp.json`, rewritten on every fresh launch
+  (removed when empty). claude 2.1.318 loads `--mcp-config` files with variable expansion on (`expandVars:!0`
   for both files and inline JSON), so the file holds `${VAR}` references only. Codex sessions and plain
   shells get the variables but no MCP servers. A session restarted in its open terminal keeps the
   variables it started with; MCP changes apply on the next launch.
@@ -418,6 +418,16 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
 Cross-area calls go only through the signatures in those three `AppModel+*.swift` files. Do not edit
 another area's files; if you need something from another area, call its contract method.
 
+## Seeing the UI without screen recording (dev aid)
+
+`App/DevSnapshot.swift`: started with `HDLANES_SNAPSHOT_DIR=<dir>` (and always a test home,
+`open -n build/hdlanes.app --env HDLANES_HOME=/tmp/hdt --env HDLANES_SNAPSHOT_DIR=<dir>`), the app walks
+a fixed tour (first session, Tracking, Inbox, Board, each Settings tab hosted in a window of its own),
+draws each window into `<name>.png` with `cacheDisplay` (no Screen Recording permission needed), puts
+back the user's last Settings tab and quits. Layer-drawn content (the SwiftTerm terminal) comes out
+blank in these images, and the Settings tab bar is drawn without its toolbar styling. Off unless the
+variable is set.
+
 ## UI guidelines (no "AI slop")
 
 - Native macOS: `NavigationSplitView` sidebar (`.listStyle(.sidebar)`), system fonts, SF Symbols,
@@ -426,7 +436,8 @@ another area's files; if you need something from another area, call its contract
 - Text sizes: body 13, secondary 11, monospaced code 12. Secondary info in `.secondary`.
 - One color per meaning: status colors (`Theme.color(for:)`), account dot color (`Theme.accountColor`),
   category color (`Theme.categoryColor`). Never more than these.
-- Every list has an empty state with one sentence + one action. Every async action has a progress state
+- Every list has an empty state with one sentence + one action; side panels use `CompactEmptyState`
+  (13 pt title), not `ContentUnavailableView`'s large title. Every async action has a progress state
   and an error state (`model.show(error:title:)` or inline). No dead buttons: disable with a tooltip
   (`.help`) when unavailable.
 - Keyboard first: ⌘N new session, ⌘T new task, ⌘1…⌘9 select session, ⌃⇥ next "needs you", ⌥⌘I inspector, ⇧⌘I import.

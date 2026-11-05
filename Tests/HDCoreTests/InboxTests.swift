@@ -28,6 +28,7 @@ struct InboxTests {
         #expect(!header.contains("<<<REPLY"))
         #expect(p.components(separatedBy: "<<<REPLY").count == 2)
         #expect(Inbox.field(String(repeating: "a", count: 500)).count == 200)
+        #expect(!Inbox.field("<<<<<REPLY >>>>>>").contains("<<<"))
     }
 
     @Test func argumentsAllowOnlyPlainNamedTools() throws {

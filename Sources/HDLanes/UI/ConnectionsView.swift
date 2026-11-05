@@ -76,7 +76,7 @@ private struct ConnectionRow: View {
             .controlSize(.small)
         }
         .padding(.vertical, 2)
-        .task(id: connection) { secretSaved = model.connectionHasSecret(connection) }
+        .task(id: "\(connection.id)|\(model.connectionsRevision)") { secretSaved = model.connectionHasSecret(connection) }
         .confirmationDialog(L.removeConnectionTitle(connection.name), isPresented: $confirmRemove, titleVisibility: .visible) {
             Button(L.remove, role: .destructive) { model.removeConnection(connection.id) }
             Button(L.cancel, role: .cancel) {}
@@ -187,7 +187,7 @@ private struct ConnectionEditor: View {
             TextField(L.connectionURL, text: optional(\.url), prompt: Text(verbatim: "https://example.com/mcp"))
                 .font(.system(size: 12, design: .monospaced))
             TextField(L.connectionHeader, text: optional(\.headerName), prompt: Text(verbatim: "Authorization"))
-            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: Text(verbatim: "Bearer "))
+            TextField(L.connectionHeaderPrefix, text: optional(\.headerPrefix), prompt: nil)
         case .kubeconfig:
             HStack {
                 TextField(L.connectionFile, text: optional(\.filePath), prompt: Text(verbatim: "~/.kube/readonly.yaml"))
