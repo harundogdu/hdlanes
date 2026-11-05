@@ -123,6 +123,10 @@ final class TerminalRegistry {
         model?.handleProcessExit(sessionID: id, exitCode: code)
     }
 
+    fileprivate func linkClicked(_ id: UUID, _ link: String) {
+        model?.openTerminalLink(sessionID: id, link: link)
+    }
+
     fileprivate func outputReceived(_ id: UUID, _ text: String) {
         let urls = URLDetector.localURLs(in: text)
         guard !urls.isEmpty, let rt = model?.runtime(for: id) else { return }
@@ -210,6 +214,11 @@ final class HDTerminalView: LocalProcessTerminalView {
     }
 
     required init?(coder: NSCoder) { fatalError("not supported") }
+
+    /// SwiftTerm calls this after its own link check; hdlanes decides where the link opens.
+    override func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
+        registry?.linkClicked(sessionID, link)
+    }
 
     static func makeFont(size: Double) -> NSFont {
         NSFont.monospacedSystemFont(ofSize: CGFloat(size), weight: .regular)
