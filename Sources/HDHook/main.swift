@@ -4,7 +4,7 @@ import HDCore
 // `hdlanes-hook <EventName>`  — a Claude Code hook: forwards its stdin JSON to the app's socket.
 //                              PermissionRequest waits for the answer and prints Claude's decision JSON.
 // `hdlanes-hook statusline`   — the status line: forwards the JSON, then prints the account's own status
-//                              line (HD_STATUSLINE_CHAIN) or a short "model · ctx n%".
+//                              line (HD_STATUSLINE_CHAIN) or hdlanes' own line (HDCore/StatusLine).
 //
 // Never fails loudly: every path exits 0, and without HD_SOCKET / HD_SESSION_ID (or without the app)
 // it does nothing beyond the status line text.

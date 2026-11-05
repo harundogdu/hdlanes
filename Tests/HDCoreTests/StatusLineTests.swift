@@ -22,11 +22,16 @@ struct StatusLineTests {
         #expect(plain == "5h 90% ↻09:00")
         let colored = StatusLine.render(p, accountLabel: nil, now: now, color: true, timeZone: utc)
         #expect(colored.contains("\u{1b}[31m90%"))
+        // The color follows the number shown: 84.6 prints 85 % and is red.
+        let edge = try payload(#"{"context_window":{"used_percentage":84.6}}"#)
+        #expect(StatusLine.render(edge, accountLabel: nil).contains("\u{1b}[31m85%"))
     }
 
     @Test func labelsCantInjectEscapes() {
         #expect(StatusLine.cleanLabel("Work\u{1b}]0;x\u{07}") == "Work]0;x")
         #expect(StatusLine.cleanLabel(String(repeating: "a", count: 40)).count == 24)
+        #expect(StatusLine.cleanLabel("a\u{202E}b\u{9B}c") == "abc")
+        #expect(StatusLine.cleanLabel("👩‍💻 iş") == "👩‍💻 iş")
         let vars = EnvBuilder.SessionVariables(socketPath: "/s", sessionID: UUID(), accountID: nil, accountLabel: "Kişisel\n")
         #expect(vars.environment[HookEnv.accountLabel] == "Kişisel")
         #expect(EnvBuilder.SessionVariables(socketPath: "/s", sessionID: UUID(), accountID: nil).environment[HookEnv.accountLabel] == nil)

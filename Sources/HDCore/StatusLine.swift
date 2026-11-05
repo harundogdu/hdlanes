@@ -3,10 +3,18 @@ import Foundation
 /// The status line `hdlanes-hook statusline` prints under Claude Code when the account has none of its
 /// own: account · model · context · 5-hour and weekly limits, colored by how full each one is.
 public enum StatusLine {
-    /// Account labels come from the user, but they end up in a terminal: no control characters, short.
+    /// Text that ends up in a terminal: no C0/C1 controls, DEL or bidi overrides (emoji joiners stay).
+    public static func stripControls(_ text: String) -> String {
+        let scalars = text.unicodeScalars.filter { u in
+            let v = u.value
+            return !(v < 0x20 || (0x7F...0x9F).contains(v) || (0x202A...0x202E).contains(v) || (0x2066...0x2069).contains(v))
+        }
+        return String(String.UnicodeScalarView(scalars)).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Account labels: controls stripped, at most 24 characters.
     public static func cleanLabel(_ label: String) -> String {
-        let scalars = label.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) && $0.value != 0x7F }
-        let s = String(String.UnicodeScalarView(scalars)).trimmingCharacters(in: .whitespaces)
+        let s = stripControls(label)
         return s.count > 24 ? String(s.prefix(23)) + "…" : s
     }
 
@@ -17,14 +25,16 @@ public enum StatusLine {
 
         var parts: [String] = []
         if let label = accountLabel.map(cleanLabel), !label.isEmpty { parts.append(paint(label, "1")) }
-        if let model = payload.path("model.display_name")?.string, !model.isEmpty { parts.append(cleanLabel(model)) }
+        if let model = payload.path("model.display_name")?.string, !model.isEmpty { parts.append(stripControls(model)) }
         if let ctx = UsageParser.contextPercent(fromStatusLine: payload) {
-            parts.append("ctx " + paint("\(Int(ctx.rounded()))%", level(ctx)))
+            let shown = Int(ctx.rounded())
+            parts.append("ctx " + paint("\(shown)%", level(Double(shown))))
         }
         if let usage = UsageParser.claudeUsage(fromStatusLine: payload, now: now) {
             for (name, window) in [("5h", usage.fiveHour), ("7d", usage.week)] {
                 guard let window else { continue }
-                var text = "\(name) " + paint("\(Int(window.usedPercent.rounded()))%", level(window.usedPercent))
+                let shown = Int(window.usedPercent.rounded())
+                var text = "\(name) " + paint("\(shown)%", level(Double(shown)))
                 // Near the limit, say when it resets.
                 if window.usedPercent >= 80, let reset = window.resetsAt, reset > now {
                     text += " ↻" + resetText(reset, now: now, timeZone: timeZone)
