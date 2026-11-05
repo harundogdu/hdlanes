@@ -10,6 +10,9 @@ struct SettingsView: View {
             GeneralSettings()
                 .tabItem { Label(L.general, systemImage: "gearshape") }
                 .tag("general")
+            TerminalSettingsView()
+                .tabItem { Label(L.terminal, systemImage: "terminal") }
+                .tag("terminal")
             AccountsView()
                 .tabItem { Label(L.accounts, systemImage: "person.2") }
                 .tag("accounts")
@@ -49,11 +52,6 @@ private struct GeneralSettings: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
-            Section(L.terminal) {
-                Stepper(value: fontSize, in: 9...24, step: 1) {
-                    Text(L.terminalFontSize(Int(fontSize.wrappedValue)))
-                }
-            }
         }
         .formStyle(.grouped)
     }
@@ -80,14 +78,6 @@ private struct GeneralSettings: View {
     private func flag(_ key: WritableKeyPath<AppSettings, Bool?>, default value: Bool) -> Binding<Bool> {
         Binding(get: { model.state.settings[keyPath: key] ?? value },
                 set: { model.state.settings[keyPath: key] = $0 })
-    }
-
-    private var fontSize: Binding<Double> {
-        Binding(get: { model.state.settings.terminalFontSize ?? 13 },
-                set: { size in
-                    model.state.settings.terminalFontSize = size
-                    model.terminals.applyFontSize(size)
-                })
     }
 }
 

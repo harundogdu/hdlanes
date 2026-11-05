@@ -8,6 +8,7 @@ import Foundation
 ///   accounts/claude/<uuid>/          CLAUDE_CONFIG_DIR of a managed Claude account
 ///   accounts/codex/<uuid>/           CODEX_HOME of a managed Codex account
 ///   plugin/claude/                   generated Claude Code plugin (hooks → hdlanes-hook)
+///   themes/                          imported terminal themes (Ghostty files, .itermcolors)
 ///   run/hd.sock                      Unix socket the hook talks to (dir 0700, socket 0600)
 ///   run/sessions/<uuid>/settings.json  per-session `--settings` (status line wrapper)
 public struct HDPaths: Sendable {
@@ -28,6 +29,7 @@ public struct HDPaths: Sendable {
     public var stateFile: URL { root.appendingPathComponent("state.json") }
     public var accountsDir: URL { root.appendingPathComponent("accounts", isDirectory: true) }
     public var claudePluginDir: URL { root.appendingPathComponent("plugin/claude", isDirectory: true) }
+    public var themesDir: URL { root.appendingPathComponent("themes", isDirectory: true) }
     public var runDir: URL { root.appendingPathComponent("run", isDirectory: true) }
     public var socketPath: String { runDir.appendingPathComponent("hd.sock").path }
 

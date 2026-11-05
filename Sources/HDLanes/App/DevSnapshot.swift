@@ -36,7 +36,7 @@ enum DevSnapshot {
                                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
         settingsWindow.identifier = NSUserInterfaceItemIdentifier("dev-settings")
         settingsWindow.isReleasedWhenClosed = false
-        for tab in ["general", "accounts", "connections", "tasks"] {
+        for tab in ["general", "terminal", "accounts", "connections", "tasks"] {
             steps.append(("settings-\(tab)", {
                 defaults.set(tab, forKey: "hd.settingsTab")
                 settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(model))

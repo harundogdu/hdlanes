@@ -149,6 +149,12 @@ private struct SessionTerminalArea: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // The account's color along the top edge, so the account is visible at a glance.
+            if let account = model.account(session.accountID) {
+                Theme.accountColor(account.colorIndex)
+                    .frame(height: 2)
+                    .help(account.label)
+            }
             if !model.isSessionRunning(session.id) {
                 NotRunningStrip(session: session, agentExitedInShell: false)
             } else if model.agentEndedInLiveShell(session.id) {
@@ -158,7 +164,7 @@ private struct SessionTerminalArea: View {
                 .padding(.leading, 6)
                 .padding(.top, 4)
         }
-        .background(Color(nsColor: TerminalTheme.background))
+        .background(Color(nsColor: TerminalTheme.color(model.terminalPalette.background)))
     }
 }
 

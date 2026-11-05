@@ -56,6 +56,8 @@ log out of anything.
   (for example `export KUBECONFIG=…` in `.zshrc`) wins over the connection's.
 - **Browser.** The **Browser** tab opens the dev server URLs a session prints (`localhost:3000` and the
   like) next to its terminal.
+- **Terminal look.** Pick a color theme (a few built in, or import Ghostty and iTerm2 themes), a font
+  and a size in Settings › Terminal. Each session shows its account's color above the terminal.
 - **Clickable paths.** Click a file path in a terminal and it opens read-only in the **File** tab, with
   one click on to your editor, Finder or the clipboard. Folders open in Finder, local dev server links in
   the Browser tab, everything else in the app macOS picks.

@@ -207,6 +207,10 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var notifyNeedsYou: Bool?
     public var notifyDone: Bool?
     public var terminalFontSize: Double?
+    /// `TerminalPalette.id`; nil → hdlanes' own palette.
+    public var terminalTheme: String?
+    /// Font family of a fixed-pitch font; nil → the system monospaced font.
+    public var terminalFont: String?
     /// Inbox: the Claude account whose MCP connectors read and send messages.
     public var inboxAccount: UUID?
     /// Inbox: MCP tools a refresh may use (read only, picked by the user).

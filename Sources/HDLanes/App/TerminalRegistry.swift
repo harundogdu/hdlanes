@@ -14,7 +14,10 @@ final class TerminalRegistry {
 
     func view(for id: UUID) -> HDTerminalView {
         if let v = views[id] { return v }
-        let v = HDTerminalView(sessionID: id, fontSize: model?.state.settings.terminalFontSize ?? 13)
+        let settings = model?.state.settings
+        let v = HDTerminalView(sessionID: id,
+                               font: TerminalTheme.font(family: settings?.terminalFont, size: settings?.terminalFontSize ?? 13),
+                               palette: model?.terminalPalette ?? .standard)
         v.registry = self
         views[id] = v
         return v
@@ -95,8 +98,12 @@ final class TerminalRegistry {
         }
     }
 
-    func applyFontSize(_ size: Double) {
-        for v in views.values { v.font = HDTerminalView.makeFont(size: size) }
+    /// Re-applies font and colors to every open terminal after a settings change.
+    func applyAppearance(font: NSFont, palette: TerminalPalette) {
+        for v in views.values {
+            if v.font != font { v.font = font }
+            TerminalTheme.apply(palette, to: v)
+        }
     }
 
     // MARK: Callbacks from views
@@ -199,9 +206,9 @@ final class HDTerminalView: LocalProcessTerminalView {
     weak var registry: TerminalRegistry?
     private let events = ProcessEvents()
 
-    init(sessionID: UUID, fontSize: Double) {
+    init(sessionID: UUID, font: NSFont, palette: TerminalPalette) {
         self.sessionID = sessionID
-        super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 500), font: Self.makeFont(size: fontSize),
+        super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 500), font: font,
                    options: TerminalOptions(scrollback: 10_000))
         events.owner = self
         processDelegate = events
@@ -209,7 +216,7 @@ final class HDTerminalView: LocalProcessTerminalView {
         // for keys without a character (arrows, ⌥⌫, ⌥⏎).
         optionAsMetaKey = false
         optionAsMetaKeyForFunctionalKeys = true
-        TerminalTheme.apply(to: self)
+        TerminalTheme.apply(palette, to: self)
         installOutputObserver()
     }
 
@@ -218,10 +225,6 @@ final class HDTerminalView: LocalProcessTerminalView {
     /// SwiftTerm calls this after its own link check; hdlanes decides where the link opens.
     override func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
         registry?.linkClicked(sessionID, link)
-    }
-
-    static func makeFont(size: Double) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: CGFloat(size), weight: .regular)
     }
 
     /// Output arrived (called on SwiftTerm's parse thread). Throttled hop to main to scan the

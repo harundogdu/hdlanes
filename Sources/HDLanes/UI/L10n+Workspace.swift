@@ -559,3 +559,21 @@ extension L {
              "Bu terminalde başka bir program çalışıyor. Onu kapatıp yeniden dene ya da oturumu durdurup sürdür.")
     }
 }
+
+// OWNER: workspace area. Settings › Terminal.
+extension L {
+    static var terminalColors: String { pick("Colors", "Renkler") }
+    static var terminalTheme: String { pick("Theme", "Tema") }
+    static var importThemeEllipsis: String { pick("Import Theme…", "Tema İçe Aktar…") }
+    static var showThemesFolder: String { pick("Themes Folder", "Temalar Klasörü") }
+    static var importThemeNote: String {
+        pick("Ghostty theme files and iTerm2 .itermcolors work. They are copied to ~/.hdlanes/themes; files you put there show up after Reload. Claude Code and Codex draw with these colors too.",
+             "Ghostty tema dosyaları ve iTerm2 .itermcolors çalışır. ~/.hdlanes/themes klasörüne kopyalanır; oraya koyduğun dosyalar Yeniden Yükle'den sonra görünür. Claude Code ve Codex de bu renklerle çizer.")
+    }
+    static func themesRejected(_ names: [String]) -> String {
+        pick("Not a theme: \(names.joined(separator: ", "))", "Tema değil: \(names.joined(separator: ", "))")
+    }
+    static var terminalFontSection: String { pick("Font", "Yazı Tipi") }
+    static var terminalFontFamily: String { pick("Family", "Aile") }
+    static var terminalSystemFont: String { pick("System (SF Mono)", "Sistem (SF Mono)") }
+}
