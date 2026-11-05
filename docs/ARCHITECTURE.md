@@ -48,6 +48,7 @@ accounts/claude/<uuid>/            CLAUDE_CONFIG_DIR of a managed Claude account
 accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700); AGENTS.md, skills, agents,
                                    prompts may be symlinks into ~/.codex
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json
+themes/                            imported terminal themes (Ghostty files, .itermcolors)
 run/hd.sock                        hook socket (run/ is 0700)
 run/sessions/<uuid>/mcp.json       per-session --mcp-config of the session's MCP connections (0600, no secrets)
 run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline,
@@ -461,4 +462,10 @@ absolute and `~/` paths open, and a `:line` suffix is dropped.
   and an error state (`model.show(error:title:)` or inline). No dead buttons: disable with a tooltip
   (`.help`) when unavailable.
 - Keyboard first: ⌘N new session, ⌘T new task, ⌘1…⌘9 select session, ⌃⇥ next "needs you", ⌥⌘I inspector, ⇧⌘I import.
-- Terminal area stays dark in both appearances (TerminalTheme).
+- Terminal colors come from `TerminalPalette` (HDCore): built-ins (hdlanes' own dark palette is the
+  default and stays dark in both appearances) or a Ghostty / iTerm2 theme file in `themes/`, chosen in
+  Settings › Terminal and stored as `settings.terminalTheme` (`builtin:<id>` / `file:<name>`; unknown ids
+  fall back to the default). Colors an imported theme leaves out come from the default palette.
+  `terminalFont` is a fixed-pitch family (nil = SF Mono). Changes apply to open terminals at once
+  (`TerminalRegistry.applyAppearance`).
+- A session with an account shows the account's color as a 2 pt line above its terminal.

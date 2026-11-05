@@ -72,6 +72,8 @@ final class AppModel {
     var importPreset: ImportPreset?
 
     @ObservationIgnored let terminals = TerminalRegistry()
+    /// Colors of every terminal (`UI/AppModel+Appearance.swift`).
+    var terminalPalette: TerminalPalette = .standard
 
     // Runtime area (Runtime/)
     @ObservationIgnored var runtimeServices = RuntimeServices()
@@ -111,6 +113,7 @@ final class AppModel {
         case .fresh, .loaded:
             break
         }
+        terminalPalette = TerminalPalette.resolve(state.settings.terminalTheme, themesDir: paths.themesDir)
         terminals.model = self
     }
 

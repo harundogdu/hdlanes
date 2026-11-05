@@ -429,7 +429,7 @@ struct LoginTerminalSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             TerminalHost(sessionID: terminalID)
                 .padding(6)
-                .background(Color(nsColor: TerminalTheme.background), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color(nsColor: TerminalTheme.color(model.terminalPalette.background)), in: RoundedRectangle(cornerRadius: 6))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if isClaudeToken {
                 HStack {
