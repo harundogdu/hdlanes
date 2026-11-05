@@ -33,7 +33,8 @@ extension AppModel {
 
     func refreshInbox() async {
         guard let account = inboxAccount, !inbox.isRefreshing,
-              let args = Inbox.arguments(model: "sonnet", tools: inboxReadTools) else { return }
+              let args = Inbox.arguments(model: "sonnet", tools: inboxReadTools,
+                                         deny: [inboxSendTool].compactMap { $0 }) else { return }
         inbox.isRefreshing = true
         inbox.error = nil
         defer { inbox.isRefreshing = false }
@@ -63,6 +64,12 @@ extension AppModel {
         defer { inbox.sending.remove(item.id) }
         let result = await runAccountCLI(account, arguments: args,
                                          stdin: Data(Inbox.sendPrompt(item: item, reply: text).utf8), timeout: 180)
+        if result.timedOut {
+            // The tool may have fired before the timeout; hide the item so it isn't sent twice.
+            inbox.sendErrors[item.id] = L.inboxSendTimedOut
+            inbox.hidden.insert(item.id)
+            return false
+        }
         if let problem = cliProblem(result) {
             inbox.sendErrors[item.id] = problem
             return false

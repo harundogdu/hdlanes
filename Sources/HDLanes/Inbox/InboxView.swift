@@ -185,8 +185,12 @@ private struct InboxSetupSheet: View {
                 Picker(L.inboxAccountLabel, selection: Binding(
                     get: { settings.inboxAccount },
                     set: { id in
+                        guard id != settings.inboxAccount else { return }
+                        // Tool names belong to an account; a new account starts from a fresh list.
                         model.updateSettings { $0.inboxAccount = id; $0.inboxReadTools = nil; $0.inboxSendTool = nil }
                         model.inbox.availableTools = []
+                        model.inbox.unavailableServers = []
+                        model.inbox.toolsError = nil
                     })) {
                     Text(L.inboxChooseAccount).tag(UUID?.none)
                     ForEach(model.accounts(for: .claude)) { a in Text(a.label).tag(UUID?.some(a.id)) }
@@ -211,9 +215,9 @@ private struct InboxSetupSheet: View {
                 }
                 ForEach(toolList, id: \.self) { tool in
                     Picker(selection: role(tool)) {
-                        Text(L.inboxToolUnused).tag(Inbox.ToolGuess.other)
-                        Text(L.inboxRead).tag(Inbox.ToolGuess.read)
-                        Text(L.inboxSendRole).tag(Inbox.ToolGuess.send)
+                        Text(L.inboxToolUnused).tag(Inbox.ToolRole.unused)
+                        Text(L.inboxRead).tag(Inbox.ToolRole.read)
+                        Text(L.inboxSendRole).tag(Inbox.ToolRole.send)
                     } label: {
                         Text(tool).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                     }
@@ -245,11 +249,11 @@ private struct InboxSetupSheet: View {
         return tools
     }
 
-    private func role(_ tool: String) -> Binding<Inbox.ToolGuess> {
+    private func role(_ tool: String) -> Binding<Inbox.ToolRole> {
         Binding(
             get: {
                 if model.inboxSendTool == tool { return .send }
-                return model.inboxReadTools.contains(tool) ? .read : .other
+                return model.inboxReadTools.contains(tool) ? .read : .unused
             },
             set: { new in
                 model.updateSettings { s in
@@ -258,7 +262,7 @@ private struct InboxSetupSheet: View {
                     switch new {
                     case .read: read.append(tool)
                     case .send: s.inboxSendTool = tool
-                    case .other: break
+                    case .unused: break
                     }
                     s.inboxReadTools = read.isEmpty ? nil : read
                 }

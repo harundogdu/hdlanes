@@ -30,6 +30,10 @@ extension L {
     static var inboxOpen: String { pick("Open", "Aç") }
     static var inboxDismiss: String { pick("Dismiss", "Gizle") }
     static var inboxSending: String { pick("Sending…", "Gönderiliyor…") }
+    static var inboxSendTimedOut: String {
+        pick("No answer in time; the reply may have been sent. Check in the app before sending again.",
+             "Zamanında cevap gelmedi; cevap gönderilmiş olabilir. Yeniden göndermeden önce uygulamada kontrol et.")
+    }
     static var inboxSendFailed: String { pick("Sending failed.", "Gönderilemedi.") }
     static func inboxConfirmTitle(_ to: String) -> String { pick("Send this reply to \(to)?", "Bu cevap \(to) kişisine gönderilsin mi?") }
     static var inboxSend: String { pick("Send", "Gönder") }

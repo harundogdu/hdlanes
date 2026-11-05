@@ -391,8 +391,15 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
   stdin: messages from the last N hours that need the user, as a JSON array `{source, messageID, from,
   subject, received, summary, suggestedReply, link}`; message contents are data; change nothing. Items
   without id or sender are dropped; only https links are kept. Items live in memory only.
+- **Refresh denies the Send tool explicitly** (`--disallowedTools`): `dontAsk` turns unanswered prompts
+  into denials but keeps `permissions.allow` rules from the account's own settings, and a deny rule
+  beats them. Another allow rule in those settings could still widen a run; keep inbox accounts' allow
+  lists empty for MCP tools.
 - **Reply.** The suggested reply opens in an editor; **Send…** shows the exact text in a confirmation
   dialog; then one run allowed only the Send tool, told to send that text unchanged and answer `SENT`.
+  Sender-written fields (source, id, from, subject) are flattened to one line, stripped of quotes and
+  markers and capped before they reach that prompt. A run that times out hides the item and says the
+  reply may have been sent, so it isn't sent twice.
 - Verified with claude 2.1.318: `dontAsk` + `--allowedTools X` lets the model call X and refuses any
   other MCP tool (`permission_denials`); the init line lists claude.ai connector tools and a
   `needs-auth` status for a connector that isn't signed in for `-p`. Not run against real mail.
@@ -405,6 +412,7 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext,Connections}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
+| inbox | `Inbox/*`, `HDCore/Inbox.swift` + tests | `Inbox/AppModel+Inbox.swift` (`refreshInbox`, `sendInboxReply`, `loadInboxTools`) |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
 
 Cross-area calls go only through the signatures in those three `AppModel+*.swift` files. Do not edit
