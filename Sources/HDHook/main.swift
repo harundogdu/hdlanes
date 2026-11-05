@@ -4,7 +4,7 @@ import HDCore
 // `hdlanes-hook <EventName>`  — a Claude Code hook: forwards its stdin JSON to the app's socket.
 //                              PermissionRequest waits for the answer and prints Claude's decision JSON.
 // `hdlanes-hook statusline`   — the status line: forwards the JSON, then prints the account's own status
-//                              line (HD_STATUSLINE_CHAIN) or a short "model · ctx n%".
+//                              line (HD_STATUSLINE_CHAIN) or hdlanes' own line (HDCore/StatusLine).
 //
 // Never fails loudly: every path exits 0, and without HD_SOCKET / HD_SESSION_ID (or without the app)
 // it does nothing beyond the status line text.
@@ -225,11 +225,9 @@ func runChain(_ command: String, input: Data, environment: [String: String]) -> 
     return box.value
 }
 
-func defaultStatusLine(_ payload: JSONValue) -> Data {
-    var parts: [String] = []
-    if let model = payload.path("model.display_name")?.string, !model.isEmpty { parts.append(model) }
-    if let percent = UsageParser.contextPercent(fromStatusLine: payload) { parts.append("ctx \(Int(percent.rounded()))%") }
-    return parts.isEmpty ? Data() : Data((parts.joined(separator: " · ") + "\n").utf8)
+func defaultStatusLine(_ payload: JSONValue, accountLabel: String?) -> Data {
+    let line = StatusLine.render(payload, accountLabel: accountLabel)
+    return line.isEmpty ? Data() : Data((line + "\n").utf8)
 }
 
 // MARK: Main
@@ -252,7 +250,7 @@ if event == "statusline" {
     if let chain = environment[HookEnv.statusLineChain], !chain.trimmingCharacters(in: .whitespaces).isEmpty {
         printOut(runChain(chain, input: input, environment: environment))
     } else {
-        printOut(defaultStatusLine(payload))
+        printOut(defaultStatusLine(payload, accountLabel: environment[HookEnv.accountLabel]))
     }
     exit(0)
 }

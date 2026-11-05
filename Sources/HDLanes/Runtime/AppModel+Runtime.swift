@@ -221,7 +221,8 @@ extension AppModel {
             rt.startedAt = Date()
         } else {
             let vars = EnvBuilder.SessionVariables(socketPath: paths.socketPath, sessionID: sessionID,
-                                                   accountID: account?.id, statusLineChain: chain)
+                                                   accountID: account?.id, statusLineChain: chain,
+                                                   accountLabel: account?.label)
             terminals.start(sessionID, spec: EnvBuilder.launchSpec(agentLaunch, session: vars, cwd: session.cwd,
                                                                    processEnv: processEnv,
                                                                    connections: connectionEnvironment(for: session)))

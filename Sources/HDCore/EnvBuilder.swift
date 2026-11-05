@@ -205,18 +205,22 @@ public enum EnvBuilder {
         public var accountID: UUID?
         /// The account's own status line command, chained by `hdlanes-hook statusline`.
         public var statusLineChain: String?
+        public var accountLabel: String?
 
-        public init(socketPath: String, sessionID: UUID, accountID: UUID?, statusLineChain: String? = nil) {
+        public init(socketPath: String, sessionID: UUID, accountID: UUID?, statusLineChain: String? = nil,
+                    accountLabel: String? = nil) {
             self.socketPath = socketPath
             self.sessionID = sessionID
             self.accountID = accountID
             self.statusLineChain = statusLineChain
+            self.accountLabel = accountLabel
         }
 
         public var environment: [String: String] {
             var env = [HookEnv.socket: socketPath, HookEnv.session: sessionID.uuidString]
             if let accountID { env[HookEnv.account] = accountID.uuidString }
             if let chain = statusLineChain, !chain.isEmpty { env[HookEnv.statusLineChain] = chain }
+            if let label = accountLabel.map(StatusLine.cleanLabel), !label.isEmpty { env[HookEnv.accountLabel] = label }
             return env
         }
     }
