@@ -12,7 +12,7 @@ public struct RGB: Hashable, Sendable {
     public init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+        guard s.count == 6, s.allSatisfy(\.isHexDigit), let v = UInt32(s, radix: 16) else { return nil }
         self.init(Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
     }
 
@@ -134,7 +134,11 @@ public struct TerminalPalette: Hashable, Sendable, Identifiable {
         guard let data = try? Data(contentsOf: url), data.count < 256_000 else { return nil }
         let name = url.deletingPathExtension().lastPathComponent
         let id = filePrefix + url.lastPathComponent
-        if url.pathExtension.lowercased() == "itermcolors" { return parseITerm(data, id: id, name: name) }
+        // iTerm2 themes are property lists, sometimes shipped as .plist.
+        if url.pathExtension.lowercased() == "itermcolors" || data.starts(with: Data("<?xml".utf8))
+            || data.starts(with: Data("bplist".utf8)) {
+            return parseITerm(data, id: id, name: name)
+        }
         guard let text = String(data: data, encoding: .utf8) else { return nil }
         return parseGhostty(text, id: id, name: name)
     }

@@ -78,7 +78,7 @@ private struct PaletteSwatch: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: "~/git/hdlanes $ claude")
+            Text(L.terminalSample)
                 .font(Font(NSFont(descriptor: font.fontDescriptor, size: 12) ?? font))
                 .foregroundStyle(Color(nsColor: TerminalTheme.color(palette.foreground)))
             HStack(spacing: 3) {

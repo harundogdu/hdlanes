@@ -562,6 +562,7 @@ extension L {
 
 // OWNER: workspace area. Settings › Terminal.
 extension L {
+    static var terminalSample: String { pick("~/git/hdlanes $ claude", "~/git/hdlanes $ claude") }
     static var terminalColors: String { pick("Colors", "Renkler") }
     static var terminalTheme: String { pick("Theme", "Tema") }
     static var importThemeEllipsis: String { pick("Import Theme…", "Tema İçe Aktar…") }

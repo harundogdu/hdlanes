@@ -189,6 +189,6 @@ private struct NotRunningStrip: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.regularMaterial)
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, model.terminalPalette.isDark ? .dark : .light)
     }
 }

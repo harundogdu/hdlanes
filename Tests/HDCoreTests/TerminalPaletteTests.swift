@@ -13,6 +13,7 @@ struct TerminalPaletteTests {
         #expect(RGB(hex: "#ff0000") == RGB(1, 0, 0))
         #expect(RGB(hex: "zz0000") == nil)
         #expect(RGB(hex: "fff") == nil)
+        #expect(RGB(hex: "+ff000") == nil)
     }
 
     @Test func ghosttyTheme() throws {

@@ -36,7 +36,8 @@ extension AppModel {
         var rejected: [String] = []
         var last: String?
         for url in urls {
-            guard TerminalPalette.load(file: url) != nil else {
+            // Hidden names never resolve as a theme id (see `TerminalPalette.resolve`).
+            guard !url.lastPathComponent.hasPrefix("."), TerminalPalette.load(file: url) != nil else {
                 rejected.append(url.lastPathComponent)
                 continue
             }

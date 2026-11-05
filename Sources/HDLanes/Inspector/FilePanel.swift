@@ -95,7 +95,8 @@ struct FilePanel: View {
                         .padding(.vertical, 4)
                     Divider()
                 }
-                ReadOnlyTextView(text: text, fontSize: model.state.settings.terminalFontSize ?? 13)
+                ReadOnlyTextView(text: text, font: TerminalTheme.font(family: model.state.settings.terminalFont,
+                                                                       size: max(10, (model.state.settings.terminalFontSize ?? 13) - 1)))
             }
         case .image:
             if let image {
@@ -132,7 +133,7 @@ struct FilePanel: View {
 /// Selectable, non-editable monospaced text; NSTextView keeps large files fast.
 private struct ReadOnlyTextView: NSViewRepresentable {
     let text: String
-    let fontSize: Double
+    let font: NSFont
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
@@ -151,7 +152,6 @@ private struct ReadOnlyTextView: NSViewRepresentable {
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let tv = scroll.documentView as? NSTextView else { return }
-        let font = NSFont.monospacedSystemFont(ofSize: CGFloat(max(10, fontSize - 1)), weight: .regular)
         if tv.string != text {
             tv.string = text
             tv.scrollToBeginningOfDocument(nil)
