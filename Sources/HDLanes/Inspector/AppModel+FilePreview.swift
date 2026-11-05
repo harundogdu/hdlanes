@@ -10,12 +10,12 @@ extension AppModel {
         if url.isFileURL {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+                NSWorkspace.shared.open(url)
                 return
             }
             showFile(url.standardizedFileURL, in: sessionID)
         } else if FilePreview.isLocalWebURL(url), session(sessionID) != nil {
-            BrowserSessions.session(for: sessionID, keeping: Set(state.sessions.map(\.id))).load(url)
+            BrowserSessions.session(for: sessionID, keeping: Set(state.sessions.map(\.id))).load(FilePreview.normalizedLocalWebURL(url))
             inspectorTab = .browser
             isInspectorVisible = true
         } else {
@@ -27,6 +27,16 @@ extension AppModel {
         filePreviews[sessionID] = url
         inspectorTab = .file
         isInspectorVisible = true
+    }
+
+    /// Opens the previewed file in its default app, unless it became something runnable since the click;
+    /// then it is only shown in Finder.
+    func openPreviewedFile(_ url: URL) {
+        if FilePreview.isSafeToOpen(url) {
+            NSWorkspace.shared.open(url)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
     }
 
     func closeFilePreview(_ sessionID: UUID) {

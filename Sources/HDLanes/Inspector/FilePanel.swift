@@ -9,6 +9,9 @@ struct FilePanel: View {
 
     @Environment(AppModel.self) private var model
     @State private var content: FilePreview.Content?
+    @State private var image: NSImage?
+    /// "Open in Xcode" etc.; looked up once per file, not on every render.
+    @State private var openTitle = L.openWithDefault
     @State private var reloadToken = 0
 
     var body: some View {
@@ -21,8 +24,18 @@ struct FilePanel: View {
             }
             .task(id: "\(url.path)|\(reloadToken)") {
                 content = nil
-                let loaded = await Task.detached { FilePreview.load(url) }.value
-                if !Task.isCancelled { content = loaded }
+                image = nil
+                let (loaded, picture, app) = await Task.detached { () -> (FilePreview.Content, NSImage?, String?) in
+                    let c = FilePreview.load(url)
+                    let img = c == .image ? NSImage(contentsOf: url) : nil
+                    let app = NSWorkspace.shared.urlForApplication(toOpen: url)
+                        .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") }
+                    return (c, img, app)
+                }.value
+                guard !Task.isCancelled else { return }
+                image = picture
+                openTitle = app.map(L.openIn) ?? L.openWithDefault
+                content = loaded
             }
         } else {
             CompactEmptyState(title: L.fileEmptyTitle, symbol: "doc.text", detail: L.fileEmptyDetail)
@@ -44,7 +57,7 @@ struct FilePanel: View {
             Button { reloadToken += 1 } label: { Label(L.reload, systemImage: "arrow.clockwise").labelStyle(.iconOnly) }
                 .help(L.reload)
             Menu {
-                Button(openTitle(url)) { NSWorkspace.shared.open(url) }
+                Button(openTitle) { model.openPreviewedFile(url) }
                 Button(L.revealInFinder) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                 Button(L.copyPath) {
                     NSPasteboard.general.clearContents()
@@ -53,11 +66,11 @@ struct FilePanel: View {
             } label: {
                 Label(L.openWithDefault, systemImage: "arrow.up.right.square").labelStyle(.iconOnly)
             } primaryAction: {
-                NSWorkspace.shared.open(url)
+                model.openPreviewedFile(url)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help(openTitle(url))
+            .help(openTitle)
             Button { model.closeFilePreview(sessionID) } label: { Label(L.closeFile, systemImage: "xmark").labelStyle(.iconOnly) }
                 .help(L.closeFile)
         }
@@ -85,7 +98,7 @@ struct FilePanel: View {
                 ReadOnlyTextView(text: text, fontSize: model.state.settings.terminalFontSize ?? 13)
             }
         case .image:
-            if let image = NSImage(contentsOf: url) {
+            if let image {
                 Image(nsImage: image).resizable().scaledToFit().padding(10)
             } else {
                 notice(L.fileUnreadable, url)
@@ -93,19 +106,15 @@ struct FilePanel: View {
         case .binary: notice(L.fileBinary, url)
         case .missing: notice(L.fileMissing, nil)
         case .unreadable: notice(L.fileUnreadable, url)
+        case .sensitive: notice(L.fileSensitive, nil)
         }
     }
 
     private func notice(_ text: String, _ url: URL?) -> some View {
         VStack(spacing: 8) {
             Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
-            if let url { Button(openTitle(url)) { NSWorkspace.shared.open(url) }.controlSize(.small) }
+            if let url { Button(openTitle) { model.openPreviewedFile(url) }.controlSize(.small) }
         }
-    }
-
-    private func openTitle(_ url: URL) -> String {
-        guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else { return L.openWithDefault }
-        return L.openIn(FileManager.default.displayName(atPath: app.path).replacingOccurrences(of: ".app", with: ""))
     }
 
     /// Path relative to the session's folder when it is inside it, else with `~`.

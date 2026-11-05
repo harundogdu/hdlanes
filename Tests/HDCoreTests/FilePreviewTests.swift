@@ -28,7 +28,24 @@ struct FilePreviewTests {
         #expect(FilePreview.text(from: Data([0xFF, 0xFE, 0x41]), truncated: false) == .binary)
     }
 
+    @Test func credentialsAndRunnablesStayOut() throws {
+        #expect(FilePreview.load(try temp("auth.json", Data("{}".utf8))) == .sensitive)
+        #expect(FilePreview.isSensitive(URL(fileURLWithPath: "/Users/x/.ssh/config")))
+        #expect(FilePreview.isSensitive(URL(fileURLWithPath: "/tmp/id_ed25519")))
+        #expect(!FilePreview.isSensitive(URL(fileURLWithPath: "/tmp/id_ed25519.pub")))
+        #expect(!FilePreview.isSensitive(URL(fileURLWithPath: "/tmp/README.md")))
+        let md = try temp("a.md", Data("x".utf8))
+        #expect(FilePreview.isSafeToOpen(md))
+        let sh = try temp("run.sh", Data("echo".utf8))
+        #expect(!FilePreview.isSafeToOpen(sh))
+        let plain = try temp("tool", Data("x".utf8))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: plain.path)
+        #expect(!FilePreview.isSafeToOpen(plain))
+        #expect(!FilePreview.isSafeToOpen(md.deletingLastPathComponent()))
+    }
+
     @Test func localWebURLs() {
+        #expect(FilePreview.normalizedLocalWebURL(URL(string: "http://0.0.0.0:8080/a")!).absoluteString == "http://localhost:8080/a")
         #expect(FilePreview.isLocalWebURL(URL(string: "http://localhost:3000/x")!))
         #expect(FilePreview.isLocalWebURL(URL(string: "https://127.0.0.1")!))
         #expect(!FilePreview.isLocalWebURL(URL(string: "https://github.com")!))

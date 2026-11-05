@@ -430,14 +430,17 @@ variable is set.
 
 ## Terminal links (git area)
 
-SwiftTerm checks a clicked link first (unsafe characters, custom schemes, executable files are blocked or
-asked about), then calls `requestOpenLink`; `HDTerminalView` overrides it and hands the URL to
+SwiftTerm checks a clicked link first (unsafe characters and executables, scripts such as `.sh`/`.py` and
+apps are blocked; custom schemes are asked about), then calls `requestOpenLink`; `HDTerminalView` overrides it and hands the URL to
 `AppModel.openTerminalLink` (`Inspector/AppModel+FilePreview.swift`):
 
 - `file://` to a regular file → `filePreviews[session]`, the **File** tab (`Inspector/FilePanel.swift`).
   `HDCore/FilePreview` reads at most 2 MB as UTF-8; NUL bytes or bad UTF-8 count as binary, image types
-  are drawn with `NSImage`. Nothing is written; the header menu opens it in the default app.
-- `file://` to a folder → Finder. `http(s)` to localhost / 127.0.0.1 / 0.0.0.0 / [::1] → the Browser tab.
+  are drawn with `NSImage`. Credential files (`auth.json`, `.credentials.json`, `.env`, `~/.ssh/*`, keys)
+  are not read. Nothing is written; the header menu opens it in the default app after re-checking it isn't
+  executable, a script or an app by then (otherwise it only reveals it in Finder).
+- `file://` to a folder → opened in Finder. `http(s)` to localhost / 127.0.0.1 / 0.0.0.0 (as localhost) /
+  [::1] → the Browser tab.
   Anything else → `NSWorkspace.open`, as before.
 
 Paths without an OSC 8 link are resolved by SwiftTerm against the app's own working directory, so only
