@@ -20,8 +20,8 @@ extension AppModel {
         defer { inbox.isLoadingTools = false }
         let result = await runAccountCLI(account, arguments: Inbox.toolListArguments,
                                          stdin: Data("Reply with OK.".utf8), timeout: 90)
-        if result.launchFailed || AccountCLI.isCommandNotFound(status: result.status, output: result.combined) {
-            inbox.toolsError = WorkspaceError.cliMissing(.claude).errorDescription
+        if let problem = cliProblem(result) {
+            inbox.toolsError = problem
             return
         }
         // A login-shell profile may print before Claude; find the init line rather than assume line one.
@@ -37,7 +37,7 @@ extension AppModel {
             } else if result.status == 0, Inbox.isInitLine(line) {
                 inbox.toolsError = L.inboxNoTools
             } else {
-                inbox.toolsError = result.firstErrorLine() ?? L.inboxNoTools
+                inbox.toolsError = readableErrorLine(result) ?? L.inboxNoTools
             }
         }
     }
@@ -58,7 +58,7 @@ extension AppModel {
         }
         guard let text = ClaudePrintOutput.result(from: result.stdout), let items = Inbox.parseItems(text) else {
             inbox.error = ClaudePrintOutput.errorText(from: result.stdout)
-                ?? (result.status != 0 ? (result.firstErrorLine() ?? L.inboxFailed) : L.inboxUnreadable)
+                ?? (result.status != 0 ? (readableErrorLine(result) ?? L.inboxFailed) : L.inboxUnreadable)
             return
         }
         inbox.items = items
@@ -90,7 +90,8 @@ extension AppModel {
         let answer = ClaudePrintOutput.result(from: result.stdout) ?? ""
         guard Inbox.sendSucceeded(answer) else {
             inbox.sendErrors[item.id] = answer.isEmpty
-                ? (ClaudePrintOutput.errorText(from: result.stdout) ?? result.firstErrorLine() ?? L.inboxSendFailed)
+                ? (ClaudePrintOutput.errorText(from: result.stdout)
+                   ?? (result.status != 0 ? readableErrorLine(result) : nil) ?? L.inboxSendFailed)
                 : answer
             return false
         }
@@ -101,6 +102,12 @@ extension AppModel {
     func updateSettings(_ change: (inout AppSettings) -> Void) { change(&state.settings) }
 
     func dismissInboxItem(_ item: Inbox.Item) { inbox.hidden.insert(item.id) }
+
+    /// The CLI's first error line, unless it is one of Claude's JSON lines (never shown raw).
+    private func readableErrorLine(_ result: CLIResult) -> String? {
+        guard let line = result.firstErrorLine(), !line.hasPrefix("{") else { return nil }
+        return line
+    }
 
     private func cliProblem(_ result: CLIResult) -> String? {
         if result.launchFailed || AccountCLI.isCommandNotFound(status: result.status, output: result.combined) {

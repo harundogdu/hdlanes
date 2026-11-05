@@ -173,8 +173,12 @@ public enum ClaudePrintOutput {
             guard trimmed.hasPrefix("{"), let data = trimmed.data(using: .utf8),
                   let json = try? JSONDecoder().decode(JSONValue.self, from: data),
                   json["type"]?.string == "result", json["is_error"]?.bool == true else { continue }
-            let text = (json["result"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.isEmpty ? nil : String(text.prefix(300))
+            // A line that says is_error always yields something: its text, its first error, or its subtype.
+            let candidates = [json["result"]?.string, json["errors"]?.array?.first?.string, json["subtype"]?.string]
+            for case let text? in candidates.map({ $0?.trimmingCharacters(in: .whitespacesAndNewlines) }) where !text.isEmpty {
+                return String(text.prefix(300))
+            }
+            return "error"
         }
         return nil
     }

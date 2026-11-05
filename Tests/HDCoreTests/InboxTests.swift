@@ -24,6 +24,8 @@ struct InboxTests {
         #expect(ClaudePrintOutput.errorText(from: single) == "Invalid API key · Fix external API key")
         #expect(ClaudePrintOutput.errorText(from: #"{"type":"result","is_error":false,"result":"ok"}"#) == nil)
         #expect(ClaudePrintOutput.errorText(from: "zsh: command not found: claude") == nil)
+        #expect(ClaudePrintOutput.errorText(from: #"{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["boom"]}"#) == "boom")
+        #expect(ClaudePrintOutput.errorText(from: #"{"type":"result","subtype":"error_during_execution","is_error":true}"#) == "error_during_execution")
     }
 
     @Test func refreshDeniesTheSendTool() throws {
