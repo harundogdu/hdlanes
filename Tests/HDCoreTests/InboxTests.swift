@@ -9,6 +9,9 @@ struct InboxTests {
         #expect(Inbox.unavailableServers(fromInitLine: line).map(\.name) == ["gmail"])
         #expect(Inbox.mcpTools(fromInitLine: #"{"type":"assistant"}"#).isEmpty)
         #expect(Inbox.mcpTools(fromInitLine: "not json").isEmpty)
+        #expect(Inbox.isInitLine(#"{"type":"system","subtype":"init","tools":[]}"#))
+        #expect(!Inbox.isInitLine(#"{"type":"assistant"}"#))
+        #expect(!Inbox.isInitLine("Error: not logged in"))
     }
 
     @Test func refreshDeniesTheSendTool() throws {

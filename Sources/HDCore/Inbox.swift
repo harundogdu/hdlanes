@@ -51,6 +51,13 @@ public enum Inbox {
         return tools.compactMap(\.string).filter(isPlainToolName).sorted()
     }
 
+    /// True for the stream-json `init` line, even when it lists no MCP tools.
+    public static func isInitLine(_ line: String) -> Bool {
+        guard let data = line.data(using: .utf8),
+              let json = try? JSONDecoder().decode(JSONValue.self, from: data) else { return false }
+        return json["type"]?.string == "system" && json["subtype"]?.string == "init"
+    }
+
     /// MCP servers from the same `init` line whose status isn't `connected` (e.g. `needs-auth`), so the
     /// setup can say why their tools are missing.
     public static func unavailableServers(fromInitLine line: String) -> [(name: String, status: String)] {

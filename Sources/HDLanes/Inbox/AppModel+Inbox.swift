@@ -28,7 +28,10 @@ extension AppModel {
         let tools = Inbox.mcpTools(fromInitLine: line)
         inbox.availableTools = tools
         inbox.unavailableServers = Inbox.unavailableServers(fromInitLine: line).map { "\($0.name) (\($0.status))" }
-        if tools.isEmpty { inbox.toolsError = result.firstErrorLine() ?? L.inboxNoTools }
+        // Claude started but has no MCP tools: say so, not the raw init line it printed first.
+        if tools.isEmpty {
+            inbox.toolsError = Inbox.isInitLine(line) ? L.inboxNoTools : (result.firstErrorLine() ?? L.inboxNoTools)
+        }
     }
 
     func refreshInbox() async {
