@@ -13,6 +13,21 @@ public enum CrossCheck {
         "--disable-slash-commands",
     ]
 
+    /// `codex exec` flags, verified with codex 0.166.0: no tool that can act. Shell, exec, apps, plugins,
+    /// agents, browser and web search are off (asked to run `ls /`, it says it has no tool); the
+    /// `apply_patch` tool stays offered but every write is rejected (read-only sandbox, approvals never).
+    /// No user config.toml (MCP servers, profiles, notify, hooks), no execpolicy rules, no project docs,
+    /// nothing saved. `$CODEX_HOME/AGENTS.md` is still read by Codex. JSONL events on stdout; the prompt
+    /// goes in on stdin (`-`).
+    public static let codexArguments = [
+        "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+        "--ignore-rules", "--color", "never", "--json",
+        "--disable", "shell_tool", "--disable", "unified_exec", "--disable", "apps", "--disable", "plugins",
+        "--disable", "multi_agent", "--disable", "image_generation", "--disable", "browser_use",
+        "--disable", "computer_use", "--disable", "view_image", "--disable", "hooks", "--disable", "goals",
+        "-c", #"web_search="disabled""#, "-c", #"approval_policy="never""#, "-c", "project_doc_max_bytes=0", "-",
+    ]
+
     /// Characters of diff text sent at most; the rest is cut and the prompt says so.
     public static let defaultDiffLimit = 120_000
 

@@ -374,8 +374,21 @@ not in the diff becomes a file-level note; an unknown file becomes a file-level 
 with the path in its text, so nothing is sent unseen; line numbers that aren't positive integers are
 dropped) and added as a `ReviewNote` prefixed
 with `[<account label>]`, so the user edits or deletes it and sends the notes to the session's agent the
-usual way. Works for Claude and Codex sessions; the checker is always a Claude account. Verified live
-with claude 2.1.318: `--tools ""` + stdin prompt → one turn, JSON array reply.
+usual way. Works for Claude and Codex sessions. Verified live with claude 2.1.318: `--tools ""` + stdin
+prompt → one turn, JSON array reply.
+
+A Codex account can be the checker too: `codex exec` with `CrossCheck.codexArguments` (`--sandbox
+read-only --skip-git-repo-check --ephemeral --ignore-user-config --ignore-rules --color never --json`,
+`--disable` for shell_tool, unified_exec, apps, plugins, multi_agent, image_generation, browser_use,
+computer_use, view_image, hooks, goals, `-c web_search="disabled"` (the default is `cached`, i.e. on),
+`-c approval_policy="never"`, `-c project_doc_max_bytes=0`, prompt on stdin via `-`). Verified with codex
+0.166.0: asked to run `ls /` it answers that it has no tool; the real prompt with a small diff returns the
+JSON array. `apply_patch` (and `update_plan`) are still offered, not behind a feature flag, but every
+write is rejected by the read-only sandbox with approvals set to never, so no tool can act.
+`--ignore-user-config` drops only `$CODEX_HOME/config.toml`; `$CODEX_HOME/AGENTS.md` is still injected
+and can change the reply's shape (then the run reads as unreadable). `HDCore/CodexExecOutput` reads the
+JSONL: the last `item.completed` agent message is the reply unless a `turn.failed` follows; an `error`
+event is not terminal (retried stream errors) and is shown only when no `turn.completed` follows it.
 
 ## Inbox (inbox area)
 
