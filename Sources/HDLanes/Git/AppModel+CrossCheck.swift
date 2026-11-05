@@ -50,7 +50,8 @@ extension AppModel {
             }
             outcome = .done(account: account.label, added: findings.count)
         } else {
-            outcome = .failed(result.status != 0 ? (result.firstErrorLine() ?? L.crossCheckFailed) : L.crossCheckUnreadable)
+            outcome = .failed(ClaudePrintOutput.errorText(from: result.stdout)
+                ?? (result.status != 0 ? (result.firstErrorLine() ?? L.crossCheckFailed) : L.crossCheckUnreadable))
         }
         crossChecks[sessionID] = outcome
     }

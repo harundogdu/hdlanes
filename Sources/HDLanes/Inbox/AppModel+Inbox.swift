@@ -20,15 +20,26 @@ extension AppModel {
         defer { inbox.isLoadingTools = false }
         let result = await runAccountCLI(account, arguments: Inbox.toolListArguments,
                                          stdin: Data("Reply with OK.".utf8), timeout: 90)
-        if result.launchFailed || AccountCLI.isCommandNotFound(status: result.status, output: result.combined) {
-            inbox.toolsError = WorkspaceError.cliMissing(.claude).errorDescription
+        if let problem = cliProblem(result) {
+            inbox.toolsError = problem
             return
         }
-        let line = result.stdout.split(separator: "\n").first.map(String.init) ?? ""
+        // A login-shell profile may print before Claude; find the init line rather than assume line one.
+        let line = result.stdout.split(separator: "\n").map(String.init).first(where: Inbox.isInitLine) ?? ""
         let tools = Inbox.mcpTools(fromInitLine: line)
         inbox.availableTools = tools
         inbox.unavailableServers = Inbox.unavailableServers(fromInitLine: line).map { "\($0.name) (\($0.status))" }
-        if tools.isEmpty { inbox.toolsError = result.firstErrorLine() ?? L.inboxNoTools }
+        // Claude started but has no MCP tools: say so, not the raw init line it printed first.
+        if tools.isEmpty {
+            // A failed run (e.g. an expired login) still prints an init line with no tools: show its error.
+            if let error = ClaudePrintOutput.errorText(from: result.stdout) {
+                inbox.toolsError = error
+            } else if result.status == 0, Inbox.isInitLine(line) {
+                inbox.toolsError = L.inboxNoTools
+            } else {
+                inbox.toolsError = readableErrorLine(result) ?? L.inboxNoTools
+            }
+        }
     }
 
     func refreshInbox() async {
@@ -46,7 +57,8 @@ extension AppModel {
             return
         }
         guard let text = ClaudePrintOutput.result(from: result.stdout), let items = Inbox.parseItems(text) else {
-            inbox.error = result.status != 0 ? (result.firstErrorLine() ?? L.inboxFailed) : L.inboxUnreadable
+            inbox.error = ClaudePrintOutput.errorText(from: result.stdout)
+                ?? (result.status != 0 ? (readableErrorLine(result) ?? L.inboxFailed) : L.inboxUnreadable)
             return
         }
         inbox.items = items
@@ -77,7 +89,10 @@ extension AppModel {
         }
         let answer = ClaudePrintOutput.result(from: result.stdout) ?? ""
         guard Inbox.sendSucceeded(answer) else {
-            inbox.sendErrors[item.id] = answer.isEmpty ? (result.firstErrorLine() ?? L.inboxSendFailed) : answer
+            inbox.sendErrors[item.id] = answer.isEmpty
+                ? (ClaudePrintOutput.errorText(from: result.stdout)
+                   ?? (result.status != 0 ? readableErrorLine(result) : nil) ?? L.inboxSendFailed)
+                : answer
             return false
         }
         inbox.hidden.insert(item.id)
@@ -87,6 +102,12 @@ extension AppModel {
     func updateSettings(_ change: (inout AppSettings) -> Void) { change(&state.settings) }
 
     func dismissInboxItem(_ item: Inbox.Item) { inbox.hidden.insert(item.id) }
+
+    /// The CLI's first error line, unless it is one of Claude's JSON lines (never shown raw).
+    private func readableErrorLine(_ result: CLIResult) -> String? {
+        guard let line = result.firstErrorLine(), !line.hasPrefix("{") else { return nil }
+        return line
+    }
 
     private func cliProblem(_ result: CLIResult) -> String? {
         if result.launchFailed || AccountCLI.isCommandNotFound(status: result.status, output: result.combined) {

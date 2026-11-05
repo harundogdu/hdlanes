@@ -163,4 +163,23 @@ public enum ClaudePrintOutput {
         guard let text = json["result"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         return text
     }
+
+    /// The readable message of a failed call (`"type":"result","is_error":true,"result":"Invalid API key …"`),
+    /// from either `--output-format json` (one object) or `stream-json` (one object per line). nil otherwise,
+    /// so callers never show the raw JSON instead.
+    public static func errorText(from output: String) -> String? {
+        for line in output.split(whereSeparator: \.isNewline).reversed() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("{"), let data = trimmed.data(using: .utf8),
+                  let json = try? JSONDecoder().decode(JSONValue.self, from: data),
+                  json["type"]?.string == "result", json["is_error"]?.bool == true else { continue }
+            // A line that says is_error always yields something: its text, its first error, or its subtype.
+            let candidates = [json["result"]?.string, json["errors"]?.array?.first?.string, json["subtype"]?.string]
+            for case let text? in candidates.map({ $0?.trimmingCharacters(in: .whitespacesAndNewlines) }) where !text.isEmpty {
+                return String(text.prefix(300))
+            }
+            return "error"
+        }
+        return nil
+    }
 }

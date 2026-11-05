@@ -44,11 +44,18 @@ public enum Inbox {
 
     /// MCP tool names (`mcp__…`) from a `stream-json` `init` line.
     public static func mcpTools(fromInitLine line: String) -> [String] {
+        guard let tools = initJSON(line)?["tools"]?.array else { return [] }
+        return tools.compactMap(\.string).filter(isPlainToolName).sorted()
+    }
+
+    /// True for the stream-json `init` line, even when it lists no MCP tools.
+    public static func isInitLine(_ line: String) -> Bool { initJSON(line) != nil }
+
+    static func initJSON(_ line: String) -> JSONValue? {
         guard let data = line.data(using: .utf8),
               let json = try? JSONDecoder().decode(JSONValue.self, from: data),
-              json["type"]?.string == "system", json["subtype"]?.string == "init",
-              let tools = json["tools"]?.array else { return [] }
-        return tools.compactMap(\.string).filter(isPlainToolName).sorted()
+              json["type"]?.string == "system", json["subtype"]?.string == "init" else { return nil }
+        return json
     }
 
     /// MCP servers from the same `init` line whose status isn't `connected` (e.g. `needs-auth`), so the
