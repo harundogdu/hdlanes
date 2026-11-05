@@ -11,6 +11,7 @@ struct StatusLineTests {
         let p = try payload(#"{"model":{"display_name":"Opus"},"context_window":{"used_percentage":41.6},"rate_limits":{"five_hour":{"used_percentage":30,"resets_at":2000000000},"seven_day":{"used_percentage":12}}}"#)
         #expect(StatusLine.render(p, accountLabel: "İş", color: false) == "İş · Opus · ctx 42% · 5h 30% · 7d 12%")
         #expect(StatusLine.render(try payload("{}"), accountLabel: nil, color: false) == "")
+        #expect(StatusLine.render(try payload(#"{"model":{"display_name":"  \u0007"}}"#), accountLabel: "İş", color: false) == "İş")
     }
 
     @Test func colorsAndResetNearTheLimit() throws {
@@ -20,6 +21,8 @@ struct StatusLineTests {
         let utc = TimeZone(identifier: "UTC")!
         let plain = StatusLine.render(p, accountLabel: nil, now: now, color: false, timeZone: utc)
         #expect(plain == "5h 90% ↻09:00")
+        let edge80 = try payload(#"{"rate_limits":{"five_hour":{"used_percentage":79.6,"resets_at":\#(reset)}}}"#)
+        #expect(StatusLine.render(edge80, accountLabel: nil, now: now, color: false, timeZone: utc) == "5h 80% ↻09:00")
         let colored = StatusLine.render(p, accountLabel: nil, now: now, color: true, timeZone: utc)
         #expect(colored.contains("\u{1b}[31m90%"))
         // The color follows the number shown: 84.6 prints 85 % and is red.
