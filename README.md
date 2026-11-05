@@ -66,6 +66,11 @@ log out of anything.
   **Review…** button checks a PR's branch out in a fresh worktree and starts Claude or Codex on it with a
   prompt you can set per project. **End of Day** builds a Markdown report you can copy or save. Activity
   is kept in `~/.hdlanes/activity.jsonl`.
+- **Inbox.** Messages that need you (mail and chat), each with a short summary and a suggested reply
+  you can edit, send after a confirmation, or open in its app. hdlanes has no mail login of its own: it
+  reads through the connectors of a Claude account you pick (Microsoft 365, Gmail, Slack and others in
+  claude.ai), allowed only the read tools you tick, and sends only with the one tool you mark for sending.
+  It reads only when you press Refresh, and keeps nothing on disk.
 - **Task board.** Backlog, Active, Review and Done columns with drag and drop. A session can be started
   from a task and stays linked to it. Categories (bug, feature, refactor, test, docs, UI, chore, research)
   are guessed from English and Turkish keywords. If you turn it on, a single `claude -p` call on an account

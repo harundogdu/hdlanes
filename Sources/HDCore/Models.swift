@@ -207,6 +207,16 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var notifyNeedsYou: Bool?
     public var notifyDone: Bool?
     public var terminalFontSize: Double?
+    /// Inbox: the Claude account whose MCP connectors read and send messages.
+    public var inboxAccount: UUID?
+    /// Inbox: MCP tools a refresh may use (read only, picked by the user).
+    public var inboxReadTools: [String]?
+    /// Inbox: the one MCP tool a confirmed reply may use.
+    public var inboxSendTool: String?
+    /// Inbox: the user's notes on what matters.
+    public var inboxFocus: String?
+    /// Inbox: how far back a refresh looks, in hours.
+    public var inboxHours: Int?
 
     public init() {}
 }

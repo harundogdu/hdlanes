@@ -7,6 +7,7 @@ enum SidebarSelection: Hashable {
     case session(UUID)
     case board
     case tracking
+    case inbox
 }
 
 enum InspectorTab: String, CaseIterable, Identifiable {
@@ -86,6 +87,9 @@ final class AppModel {
 
     // Tracking area (Tracking/): observable on its own.
     @ObservationIgnored let tracking = TrackingStore()
+
+    // Inbox area (Inbox/): observable on its own.
+    @ObservationIgnored let inbox = InboxStore()
 
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
