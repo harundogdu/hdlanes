@@ -83,24 +83,51 @@ private struct GeneralSettings: View {
 
 private struct TaskSettings: View {
     @Environment(AppModel.self) private var model
+    @State private var jevKey = ""
+    @State private var hasJevKey = false
+    @State private var keyError: String?
 
     var body: some View {
         let claudeAccounts = model.accounts(for: .claude)
+        let enabled = model.state.settings.aiCategorization == true
         Form {
             Section {
-                Toggle(L.aiCategorization, isOn: Binding(get: { model.state.settings.aiCategorization == true },
+                Toggle(L.aiCategorization, isOn: Binding(get: { enabled },
                                                          set: { model.state.settings.aiCategorization = $0 }))
-                Picker(L.aiAccount, selection: Binding(get: { model.aiCategorizationAccount?.id },
-                                                       set: { model.state.settings.aiCategorizationAccount = $0 })) {
-                    if claudeAccounts.isEmpty { Text(L.noClaudeAccount).tag(UUID?.none) }
-                    ForEach(claudeAccounts) { a in
-                        Text(L.accountPickerLabel(a)).tag(Optional(a.id))
-                    }
+                Picker(L.aiProviderLabel, selection: Binding(get: { model.aiProvider },
+                                                             set: { model.state.settings.aiProvider = $0 })) {
+                    Text(L.aiProviderClaude).tag(AIProvider.claude)
+                    Text(L.aiProviderJev).tag(AIProvider.jev)
                 }
-                .disabled(model.state.settings.aiCategorization != true || claudeAccounts.isEmpty)
-                Text(L.aiCategorizationNote(model.aiCategorizationAccount?.label))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                .disabled(!enabled)
+                switch model.aiProvider {
+                case .claude:
+                    Picker(L.aiAccount, selection: Binding(get: { model.aiCategorizationAccount?.id },
+                                                           set: { model.state.settings.aiCategorizationAccount = $0 })) {
+                        if claudeAccounts.isEmpty { Text(L.noClaudeAccount).tag(UUID?.none) }
+                        ForEach(claudeAccounts) { a in
+                            Text(L.accountPickerLabel(a)).tag(Optional(a.id))
+                        }
+                    }
+                    .disabled(!enabled || claudeAccounts.isEmpty)
+                    Text(L.aiCategorizationNote(model.aiCategorizationAccount?.label))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                case .jev:
+                    HStack {
+                        SecureField(L.jevKeyLabel, text: $jevKey, prompt: Text(hasJevKey ? L.jevKeySaved : L.jevKeyPlaceholder))
+                        Button(L.save) { saveKey(jevKey) }
+                            .disabled(jevKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if hasJevKey { Button(L.jevRemoveKey) { saveKey("") } }
+                    }
+                    if let keyError {
+                        Text(keyError).font(.system(size: 11)).foregroundStyle(.red)
+                    }
+                    Text(L.jevNote)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text(L.categories)
             } footer: {
@@ -110,6 +137,18 @@ private struct TaskSettings: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { hasJevKey = model.hasJevKey }
+    }
+
+    private func saveKey(_ key: String) {
+        do {
+            try model.setJevKey(key)
+            keyError = nil
+            jevKey = ""
+        } catch {
+            keyError = error.localizedDescription
+        }
+        hasJevKey = model.hasJevKey
     }
 }
 

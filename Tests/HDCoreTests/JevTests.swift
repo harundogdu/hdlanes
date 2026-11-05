@@ -29,6 +29,7 @@ struct JevTests {
     @Test func errorDetails() {
         #expect(Jev.errorDetail(Data(#"{"detail":"bad model"}"#.utf8)) == "bad model")
         #expect(Jev.errorDetail(Data(#"{"detail":[{"loc":["body","state"],"msg":"Field required","type":"missing"}]}"#.utf8)) == "Field required")
+        #expect(Jev.errorDetail(Data(#"{"detail":{"error_type":"authentication_error","message":"Must supply an API key!"}}"#.utf8)) == "Must supply an API key!")
         #expect(Jev.errorDetail(Data("x".utf8)) == nil)
     }
 }

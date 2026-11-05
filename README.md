@@ -79,7 +79,7 @@ log out of anything.
 - **Task board.** Backlog, Active, Review and Done columns with drag and drop. A session can be started
   from a task and stays linked to it. Categories (bug, feature, refactor, test, docs, UI, chore, research)
   are guessed from English and Turkish keywords. If you turn it on, a single `claude -p` call on an account
-  you pick can suggest one instead.
+  you pick, or TypeSafe's Jev decision model with your own API key, can suggest one instead.
 - **Keyboard first.** ⌘N new session, ⌘T new task, ⌘1…⌘9 select a session, ⌃⇥ next session that needs
   you, ⇧⌘B board, ⌥⌘I inspector, ⇧⌘I import.
 - **English and Turkish** interface.

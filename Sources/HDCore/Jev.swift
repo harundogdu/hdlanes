@@ -58,11 +58,13 @@ public enum Jev {
         return confidence >= minConfidence ? .category(choice, confidence: confidence) : .unsure(confidence: confidence)
     }
 
-    /// A short reason from a 400/422 body (`{"detail": "…"}` or `{"detail": [{"msg": …}]}`), never the key.
+    /// A short reason from an error body (`{"detail": "…"}`, `{"detail": [{"msg": …}]}` or, seen live for a
+    /// missing key, `{"detail": {"error_type": …, "message": …}}`), never the key.
     public static func errorDetail(_ data: Data) -> String? {
         guard let json = try? JSONDecoder().decode(JSONValue.self, from: data), let detail = json["detail"] else { return nil }
         if let s = detail.string { return String(s.prefix(200)) }
         if case .array(let items) = detail, let msg = items.first?["msg"]?.string { return String(msg.prefix(200)) }
+        if let msg = detail["message"]?.string { return String(msg.prefix(200)) }
         return nil
     }
 }

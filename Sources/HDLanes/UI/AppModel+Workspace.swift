@@ -39,6 +39,8 @@ enum WorkspaceError: LocalizedError, Equatable {
     case commandFailed(String)
     case aiDisabled
     case aiUnreadable
+    case aiUnsure
+    case jevKeyMissing
     case invalidBranch(String)
     case connection(ConnectionRules.Problem)
 
@@ -55,6 +57,8 @@ enum WorkspaceError: LocalizedError, Equatable {
         case .commandFailed(let line): return line
         case .aiDisabled: return L.errAIDisabled
         case .aiUnreadable: return L.errAIUnreadable
+        case .aiUnsure: return L.errAIUnsure
+        case .jevKeyMissing: return L.errJevKeyMissing
         case .invalidBranch(let problem): return problem
         case .connection(let problem): return L.connectionProblem(problem)
         }

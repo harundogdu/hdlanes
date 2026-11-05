@@ -578,3 +578,30 @@ extension L {
     static var terminalFontFamily: String { pick("Family", "Aile") }
     static var terminalSystemFont: String { pick("System (SF Mono)", "Sistem (SF Mono)") }
 }
+
+// OWNER: workspace area. Settings › Tasks: AI provider and TypeSafe Jev.
+extension L {
+    static var aiProviderLabel: String { pick("Model", "Model") }
+    static var aiProviderClaude: String { pick("Claude account (claude -p)", "Claude hesabı (claude -p)") }
+    static var aiProviderJev: String { pick("TypeSafe Jev (API key)", "TypeSafe Jev (API anahtarı)") }
+    static var jevKeyLabel: String { pick("Jev API key", "Jev API anahtarı") }
+    static var jevKeySaved: String { pick("Saved in the Keychain", "Keychain'de kayıtlı") }
+    static var jevKeyPlaceholder: String { pick("Paste a key from console.typesafe.ai", "console.typesafe.ai'den aldığın anahtarı yapıştır") }
+    static var jevRemoveKey: String { pick("Remove Key", "Anahtarı Sil") }
+    static var jevNote: String {
+        pick("Jev is a decision model: it picks one category from the task's title and notes, which are sent to api.typesafe.ai. It doesn't write text, so the end-of-day summary still uses a Claude account. Leave it off for work you can't send to a third party.",
+             "Jev bir karar modeli: görevin başlığı ve notlarından bir kategori seçer; bunlar api.typesafe.ai'ye gönderilir. Metin yazmaz, bu yüzden gün sonu özeti yine Claude hesabıyla yapılır. Üçüncü tarafa gönderemeyeceğin işlerde kapalı tut.")
+    }
+    static var errAIUnsure: String {
+        pick("The model wasn't sure; the category is unchanged.", "Model emin olamadı; kategori değişmedi.")
+    }
+    static var errJevKeyMissing: String {
+        pick("Add a Jev API key in Settings › Tasks.", "Ayarlar › Görevler'de bir Jev API anahtarı ekle.")
+    }
+    static func jevHTTPError(_ status: Int, _ detail: String?) -> String {
+        let base = status == 401 || status == 403
+            ? pick("Jev rejected the API key", "Jev API anahtarını reddetti")
+            : pick("Jev answered with HTTP \(status)", "Jev HTTP \(status) ile cevap verdi")
+        return detail.map { "\(base): \($0)" } ?? base
+    }
+}
