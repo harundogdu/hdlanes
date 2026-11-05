@@ -407,6 +407,18 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
   other MCP tool (`permission_denials`); the init line lists claude.ai connector tools and a
   `needs-auth` status for a connector that isn't signed in for `-p`. Not run against real mail.
 
+## AI category suggestion (workspace area)
+
+Off unless `settings.aiCategorization`. `settings.aiProvider` picks the model (nil = `claude`):
+
+- `claude`: one `claude -p --model haiku` on `aiCategorizationAccount` (`Categorizer.aiPrompt`/`parseAIAnswer`).
+- `jev`: TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone` with `Authorization: Bearer <key>`;
+  one `choice` question whose `criteria` describe each category (`HDCore/Jev.swift`). The answer's
+  `choice` is used when `confidence ≥ 0.35`, else the category stays. The key lives in the Keychain under
+  `AppModel.jevKeyID` (same service as connection secrets), never in state.json. Jev is a decision
+  model and writes no text, so the end-of-day summary still uses a Claude account. Verified live: no key
+  → HTTP 403 `{"detail":{"error_type":"authentication_error","message":…}}`.
+
 ## Areas and ownership (v0.1 build-out)
 
 | Area | Files | Contract |
@@ -414,7 +426,7 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext,Connections}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner,FilePreview}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
-| workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
+| workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner,Jev}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | inbox | `Inbox/*`, `HDCore/Inbox.swift` + tests | `Inbox/AppModel+Inbox.swift` (`refreshInbox`, `sendInboxReply`, `loadInboxTools`) |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
 

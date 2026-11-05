@@ -69,9 +69,18 @@ extension AppModel {
         return accounts(for: .claude).first
     }
 
-    /// One `claude -p` call on the chosen Claude account (uses that account's quota).
+    var aiProvider: AIProvider { state.settings.aiProvider ?? .claude }
+
     func aiSuggestCategory(title: String, notes: String?) async throws -> String {
         guard isAICategorizationEnabled else { throw WorkspaceError.aiDisabled }
+        switch aiProvider {
+        case .claude: return try await claudeSuggestCategory(title: title, notes: notes)
+        case .jev: return try await jevSuggestCategory(title: title, notes: notes)
+        }
+    }
+
+    /// One `claude -p` call on the chosen Claude account (uses that account's quota).
+    private func claudeSuggestCategory(title: String, notes: String?) async throws -> String {
         guard let account = aiCategorizationAccount else { throw WorkspaceError.noAccount(.claude) }
         let prompt = Categorizer.aiPrompt(title: title, notes: notes)
         let args = ["-p", "--output-format", "json", "--model", "haiku", "--no-session-persistence", prompt]

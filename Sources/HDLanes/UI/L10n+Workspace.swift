@@ -348,8 +348,12 @@ extension L {
     static var taskTitlePlaceholder: String { pick("What needs doing", "Yapılacak iş") }
     static var noProject: String { pick("None", "Yok") }
     static var suggestWithAI: String { pick("Suggest", "Öner") }
-    static var suggestWithAIHelp: String {
-        pick("Ask Claude for a category (one short claude -p call)", "Claude'dan kategori iste (kısa bir claude -p çağrısı)")
+    static func suggestWithAIHelp(_ provider: AIProvider) -> String {
+        switch provider {
+        case .claude: return pick("Ask Claude for a category (one short claude -p call)", "Claude'dan kategori iste (kısa bir claude -p çağrısı)")
+        case .jev: return pick("Ask Jev for a category (title and notes go to api.typesafe.ai)",
+                               "Jev'den kategori iste (başlık ve notlar api.typesafe.ai'ye gider)")
+        }
     }
     static var startSessionNow: String { pick("Start a session now", "Hemen bir oturum başlat") }
 }
@@ -577,4 +581,31 @@ extension L {
     static var terminalFontSection: String { pick("Font", "Yazı Tipi") }
     static var terminalFontFamily: String { pick("Family", "Aile") }
     static var terminalSystemFont: String { pick("System (SF Mono)", "Sistem (SF Mono)") }
+}
+
+// OWNER: workspace area. Settings › Tasks: AI provider and TypeSafe Jev.
+extension L {
+    static var aiProviderLabel: String { pick("Model", "Model") }
+    static var aiProviderClaude: String { pick("Claude account (claude -p)", "Claude hesabı (claude -p)") }
+    static var aiProviderJev: String { pick("TypeSafe Jev (API key)", "TypeSafe Jev (API anahtarı)") }
+    static var jevKeyLabel: String { pick("Jev API key", "Jev API anahtarı") }
+    static var jevKeySaved: String { pick("Saved in the Keychain", "Keychain'de kayıtlı") }
+    static var jevKeyPlaceholder: String { pick("Paste a key from console.typesafe.ai", "console.typesafe.ai'den aldığın anahtarı yapıştır") }
+    static var jevRemoveKey: String { pick("Remove Key", "Anahtarı Sil") }
+    static var jevNote: String {
+        pick("Jev is a decision model: it picks one category from the task's title and notes, which are sent to api.typesafe.ai. It doesn't write text, so the end-of-day summary still uses a Claude account. Leave it off for work you can't send to a third party.",
+             "Jev bir karar modeli: görevin başlığı ve notlarından bir kategori seçer; bunlar api.typesafe.ai'ye gönderilir. Metin yazmaz, bu yüzden gün sonu özeti yine Claude hesabıyla yapılır. Üçüncü tarafa gönderemeyeceğin işlerde kapalı tut.")
+    }
+    static var errAIUnsure: String {
+        pick("The model wasn't sure; the category is unchanged.", "Model emin olamadı; kategori değişmedi.")
+    }
+    static var errJevKeyMissing: String {
+        pick("Add a Jev API key in Settings › Tasks.", "Ayarlar › Görevler'de bir Jev API anahtarı ekle.")
+    }
+    static func jevHTTPError(_ status: Int, _ detail: String?) -> String {
+        // No server text for auth failures: it is the one reply that could echo the key back.
+        if status == 401 || status == 403 { return pick("Jev rejected the API key", "Jev API anahtarını reddetti") }
+        let base = pick("Jev answered with HTTP \(status)", "Jev HTTP \(status) ile cevap verdi")
+        return detail.map { "\(base): \($0)" } ?? base
+    }
 }

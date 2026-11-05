@@ -197,12 +197,19 @@ public enum AppLanguage: String, Codable, CaseIterable, Sendable {
     case system, english, turkish
 }
 
+public enum AIProvider: String, Codable, CaseIterable, Sendable {
+    case claude, jev
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
     /// Show Allow / Deny in hdlanes for Claude permission prompts (via the PermissionRequest hook).
     public var permissionsInSidebar: Bool?
     /// Let the AI categorizer run (`claude -p` on the chosen account) for new tasks.
     public var aiCategorization: Bool?
     public var aiCategorizationAccount: UUID?
+    /// Which model suggests categories: a Claude account (`claude -p`, default) or TypeSafe's Jev
+    /// (HTTP, key in the Keychain). Jev sees the task title and notes, so it stays off unless chosen.
+    public var aiProvider: AIProvider?
     public var language: AppLanguage?
     public var notifyNeedsYou: Bool?
     public var notifyDone: Bool?
