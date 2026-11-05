@@ -42,10 +42,13 @@ public enum FilePreview {
     /// Agent and SSH credential files the File tab refuses to show.
     public static func isSensitive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        if ["auth.json", ".credentials.json", "credentials.json", ".netrc", ".env"].contains(name) { return true }
+        if ["auth.json", ".credentials.json", "credentials.json", ".netrc", ".git-credentials", ".npmrc"].contains(name) { return true }
+        if name == ".env" || name.hasPrefix(".env.") || name == ".envrc" { return true }
         if ["pem", "key", "p12", "pfx"].contains(url.pathExtension.lowercased()) { return true }
-        if name.hasPrefix("id_") && !name.hasSuffix(".pub") { return true }
-        return url.pathComponents.contains(".ssh") && !name.hasSuffix(".pub")
+        if ["id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"].contains(name.replacingOccurrences(of: "-cert", with: "")) { return true }
+        let dirs = url.pathComponents
+        if dirs.contains(".aws") || (dirs.contains(".kube") && name == "config") { return true }
+        return dirs.contains(".ssh") && !name.hasSuffix(".pub")
     }
 
     /// Re-checks a file before handing it to Launch Services later (it may have changed since the click):

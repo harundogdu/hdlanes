@@ -436,7 +436,7 @@ apps are blocked; custom schemes are asked about), then calls `requestOpenLink`;
 
 - `file://` to a regular file → `filePreviews[session]`, the **File** tab (`Inspector/FilePanel.swift`).
   `HDCore/FilePreview` reads at most 2 MB as UTF-8; NUL bytes or bad UTF-8 count as binary, image types
-  are drawn with `NSImage`. Credential files (`auth.json`, `.credentials.json`, `.env`, `~/.ssh/*`, keys)
+  are drawn with `NSImage`. Credential files (`auth.json`, `.credentials.json`, `.env*`, `~/.ssh/*`, `~/.aws/*`, `~/.kube/config`, keys)
   are not read. Nothing is written; the header menu opens it in the default app after re-checking it isn't
   executable, a script or an app by then (otherwise it only reveals it in Finder).
 - `file://` to a folder → opened in Finder. `http(s)` to localhost / 127.0.0.1 / 0.0.0.0 (as localhost) /
