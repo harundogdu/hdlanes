@@ -348,8 +348,12 @@ extension L {
     static var taskTitlePlaceholder: String { pick("What needs doing", "Yapılacak iş") }
     static var noProject: String { pick("None", "Yok") }
     static var suggestWithAI: String { pick("Suggest", "Öner") }
-    static var suggestWithAIHelp: String {
-        pick("Ask Claude for a category (one short claude -p call)", "Claude'dan kategori iste (kısa bir claude -p çağrısı)")
+    static func suggestWithAIHelp(_ provider: AIProvider) -> String {
+        switch provider {
+        case .claude: return pick("Ask Claude for a category (one short claude -p call)", "Claude'dan kategori iste (kısa bir claude -p çağrısı)")
+        case .jev: return pick("Ask Jev for a category (title and notes go to api.typesafe.ai)",
+                               "Jev'den kategori iste (başlık ve notlar api.typesafe.ai'ye gider)")
+        }
     }
     static var startSessionNow: String { pick("Start a session now", "Hemen bir oturum başlat") }
 }
@@ -599,9 +603,9 @@ extension L {
         pick("Add a Jev API key in Settings › Tasks.", "Ayarlar › Görevler'de bir Jev API anahtarı ekle.")
     }
     static func jevHTTPError(_ status: Int, _ detail: String?) -> String {
-        let base = status == 401 || status == 403
-            ? pick("Jev rejected the API key", "Jev API anahtarını reddetti")
-            : pick("Jev answered with HTTP \(status)", "Jev HTTP \(status) ile cevap verdi")
+        // No server text for auth failures: it is the one reply that could echo the key back.
+        if status == 401 || status == 403 { return pick("Jev rejected the API key", "Jev API anahtarını reddetti") }
+        let base = pick("Jev answered with HTTP \(status)", "Jev HTTP \(status) ile cevap verdi")
         return detail.map { "\(base): \($0)" } ?? base
     }
 }

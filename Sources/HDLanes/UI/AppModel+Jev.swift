@@ -36,7 +36,9 @@ extension AppModel {
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
-            throw WorkspaceError.commandFailed(L.jevHTTPError(status, Jev.errorDetail(data)))
+            // Belt and braces: never show the key even if a reply quotes it.
+            let detail = Jev.errorDetail(data).map { $0.replacingOccurrences(of: key, with: "…") }
+            throw WorkspaceError.commandFailed(L.jevHTTPError(status, detail))
         }
         switch Jev.parseCategory(data) {
         case .category(let id, _): return id

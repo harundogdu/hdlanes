@@ -246,7 +246,7 @@ struct TaskEditorSheet: View {
                         if model.isAICategorizationEnabled {
                             Button(L.suggestWithAI, action: suggest)
                                 .disabled(isSuggesting || title.nilIfBlank == nil)
-                                .help(L.suggestWithAIHelp)
+                                .help(L.suggestWithAIHelp(model.aiProvider))
                         }
                         if isSuggesting { ProgressView().controlSize(.small) }
                     }
