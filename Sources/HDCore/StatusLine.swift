@@ -25,7 +25,7 @@ public enum StatusLine {
 
         var parts: [String] = []
         if let label = accountLabel.map(cleanLabel), !label.isEmpty { parts.append(paint(label, "1")) }
-        if let model = payload.path("model.display_name")?.string, !model.isEmpty { parts.append(stripControls(model)) }
+        if let model = payload.path("model.display_name")?.string.map(stripControls), !model.isEmpty { parts.append(model) }
         if let ctx = UsageParser.contextPercent(fromStatusLine: payload) {
             let shown = Int(ctx.rounded())
             parts.append("ctx " + paint("\(shown)%", level(Double(shown))))
@@ -36,7 +36,7 @@ public enum StatusLine {
                 let shown = Int(window.usedPercent.rounded())
                 var text = "\(name) " + paint("\(shown)%", level(Double(shown)))
                 // Near the limit, say when it resets.
-                if window.usedPercent >= 80, let reset = window.resetsAt, reset > now {
+                if shown >= 80, let reset = window.resetsAt, reset > now {
                     text += " ↻" + resetText(reset, now: now, timeZone: timeZone)
                 }
                 parts.append(text)
