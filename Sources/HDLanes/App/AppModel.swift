@@ -11,7 +11,7 @@ enum SidebarSelection: Hashable {
 }
 
 enum InspectorTab: String, CaseIterable, Identifiable {
-    case changes, agents, browser
+    case changes, agents, browser, file
     var id: String { rawValue }
 }
 
@@ -78,6 +78,8 @@ final class AppModel {
 
     // Git area (Git/)
     var diffs: [UUID: SessionDiff] = [:]
+    /// File clicked in a session's terminal, shown in the File tab (`Inspector/FilePanel.swift`).
+    var filePreviews: [UUID: URL] = [:]
     var reviewNotes: [UUID: [ReviewNote]] = [:]
     /// "Check with another account" per session: running, last result or error.
     var crossChecks: [UUID: CrossCheckState] = [:]

@@ -56,6 +56,9 @@ log out of anything.
   (for example `export KUBECONFIG=…` in `.zshrc`) wins over the connection's.
 - **Browser.** The **Browser** tab opens the dev server URLs a session prints (`localhost:3000` and the
   like) next to its terminal.
+- **Clickable paths.** Click a file path in a terminal and it opens read-only in the **File** tab, with
+  one click on to your editor, Finder or the clipboard. Folders open in Finder, local dev server links in
+  the Browser tab, everything else in the app macOS picks.
 - **Usage meters.** Each account shows how much of its 5-hour and weekly limits it has used, taken from
   Claude's status line and Codex's rate-limit events. No extra requests are made.
 - **Tracking.** One view for "what's going on, what needs me, what got done". **Today** lists sessions

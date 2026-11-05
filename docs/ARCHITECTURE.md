@@ -410,7 +410,7 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
 |---|---|---|
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext,Connections}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
-| git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
+| git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner,FilePreview}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | inbox | `Inbox/*`, `HDCore/Inbox.swift` + tests | `Inbox/AppModel+Inbox.swift` (`refreshInbox`, `sendInboxReply`, `loadInboxTools`) |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
@@ -427,6 +427,21 @@ draws each window into `<name>.png` with `cacheDisplay` (no Screen Recording per
 back the user's last Settings tab and quits. Layer-drawn content (the SwiftTerm terminal) comes out
 blank in these images, and the Settings tab bar is drawn without its toolbar styling. Off unless the
 variable is set.
+
+## Terminal links (git area)
+
+SwiftTerm checks a clicked link first (unsafe characters, custom schemes, executable files are blocked or
+asked about), then calls `requestOpenLink`; `HDTerminalView` overrides it and hands the URL to
+`AppModel.openTerminalLink` (`Inspector/AppModel+FilePreview.swift`):
+
+- `file://` to a regular file → `filePreviews[session]`, the **File** tab (`Inspector/FilePanel.swift`).
+  `HDCore/FilePreview` reads at most 2 MB as UTF-8; NUL bytes or bad UTF-8 count as binary, image types
+  are drawn with `NSImage`. Nothing is written; the header menu opens it in the default app.
+- `file://` to a folder → Finder. `http(s)` to localhost / 127.0.0.1 / 0.0.0.0 / [::1] → the Browser tab.
+  Anything else → `NSWorkspace.open`, as before.
+
+Paths without an OSC 8 link are resolved by SwiftTerm against the app's own working directory, so only
+absolute and `~/` paths open, and a `:line` suffix is dropped.
 
 ## UI guidelines (no "AI slop")
 

@@ -1,7 +1,7 @@
 import HDCore
 import SwiftUI
 
-/// Right-hand panel of a session: Changes / Agents / Browser.
+/// Right-hand panel of a session: Changes / Agents / Browser / File.
 /// OWNER: git area (Changes, Browser) — Agents tab included.
 struct InspectorView: View {
     let sessionID: UUID
@@ -33,6 +33,7 @@ struct InspectorView: View {
                     case .changes: ChangesView(sessionID: sessionID)
                     case .agents: AgentsPanel(sessionID: sessionID)
                     case .browser: BrowserPanel(sessionID: sessionID)
+                    case .file: FilePanel(sessionID: sessionID)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -47,6 +48,7 @@ struct InspectorView: View {
         case .changes: return L.tabWithCount(L.tabChanges, model.diffs[sessionID]?.files.count ?? 0)
         case .agents: return L.tabWithCount(L.tabAgents, model.runtimes[sessionID]?.snapshot.runningSubagents.count ?? 0)
         case .browser: return L.tabBrowser
+        case .file: return L.tabFile
         }
     }
 

@@ -22,6 +22,11 @@ enum DevSnapshot {
         var steps: [(String, () -> Void)] = []
         if let first = model.visibleSessions.first {
             steps.append(("session", { model.selection = .session(first.id) }))
+            // The File tab with a file from the session's folder, as after clicking its path.
+            let readme = URL(fileURLWithPath: first.worktreePath ?? first.cwd).appendingPathComponent("README.md")
+            if FileManager.default.fileExists(atPath: readme.path) {
+                steps.append(("session-file", { model.showFile(readme, in: first.id) }))
+            }
         }
         steps.append(("tracking", { model.selection = .tracking }))
         steps.append(("inbox", { model.selection = .inbox }))
