@@ -66,7 +66,8 @@ extension AppModel {
                                          stdin: Data(Inbox.sendPrompt(item: item, reply: text).utf8), timeout: 180)
         if result.timedOut {
             // The tool may have fired before the timeout; hide the item so it isn't sent twice.
-            inbox.sendErrors[item.id] = L.inboxSendTimedOut
+            // Hidden rows show no error: say it in the banner.
+            inbox.error = L.inboxSendTimedOut
             inbox.hidden.insert(item.id)
             return false
         }

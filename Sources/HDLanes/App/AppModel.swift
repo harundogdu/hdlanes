@@ -83,6 +83,8 @@ final class AppModel {
     var crossChecks: [UUID: CrossCheckState] = [:]
 
     // Workspace area (UI/)
+    /// Bumped when a connection or its secret changes, so rows re-read the Keychain.
+    var connectionsRevision = 0
     var accountHealth: [UUID: AccountHealth] = [:]
 
     // Tracking area (Tracking/): observable on its own.

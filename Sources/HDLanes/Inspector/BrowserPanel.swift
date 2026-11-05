@@ -30,8 +30,7 @@ struct BrowserPanel: View {
             ZStack {
                 WebViewHost(webView: browser.webView)
                 if browser.currentURL == nil && !browser.isLoading {
-                    ContentUnavailableView(L.browserEmptyTitle, systemImage: "globe",
-                                           description: Text(L.browserEmptyDetail))
+                    CompactEmptyState(title: L.browserEmptyTitle, symbol: "globe", detail: L.browserEmptyDetail)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(.background)
                 }

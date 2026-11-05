@@ -116,8 +116,8 @@ public enum Inbox {
         let flat = s.unicodeScalars.map { CharacterSet.newlines.contains($0) || CharacterSet.controlCharacters.contains($0) ? " " : String($0) }
             .joined()
             .replacingOccurrences(of: "\"", with: "'")
-            .replacingOccurrences(of: "<<<", with: "<")
-            .replacingOccurrences(of: ">>>", with: ">")
+            .replacingOccurrences(of: "<{3,}", with: "<", options: .regularExpression)
+            .replacingOccurrences(of: ">{3,}", with: ">", options: .regularExpression)
         return String(flat.prefix(limit))
     }
 

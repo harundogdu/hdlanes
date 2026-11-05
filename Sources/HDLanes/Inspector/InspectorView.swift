@@ -12,8 +12,8 @@ struct InspectorView: View {
         @Bindable var model = model
         VStack(spacing: 0) {
             if model.session(sessionID) == nil {
-                ContentUnavailableView(L.inspectorSessionMissing, systemImage: "sidebar.right",
-                                       description: Text(L.inspectorSessionMissingDetail))
+                CompactEmptyState(title: L.inspectorSessionMissing, symbol: "sidebar.right",
+                                  detail: L.inspectorSessionMissingDetail)
             } else {
                 Picker(selection: $model.inspectorTab) {
                     ForEach(InspectorTab.allCases) { tab in

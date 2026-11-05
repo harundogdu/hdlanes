@@ -22,6 +22,7 @@ extension AppModel {
         } else {
             state.connections.append(c)
         }
+        connectionsRevision += 1
     }
 
     func removeConnection(_ id: UUID) {

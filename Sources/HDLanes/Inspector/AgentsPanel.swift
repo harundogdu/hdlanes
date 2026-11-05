@@ -12,8 +12,7 @@ struct AgentsPanel: View {
     var body: some View {
         let snapshot = model.runtimes[sessionID]?.snapshot ?? AgentRuntimeSnapshot()
         if snapshot.subagents.isEmpty && snapshot.activity.isEmpty {
-            ContentUnavailableView(L.agentsEmptyTitle, systemImage: "person.2",
-                                   description: Text(L.agentsEmptyDetail))
+            CompactEmptyState(title: L.agentsEmptyTitle, symbol: "person.2", detail: L.agentsEmptyDetail)
         } else {
             let running = snapshot.subagents.filter(\.isRunning).sorted { $0.startedAt > $1.startedAt }
             // Finished helpers that never used a tool and had no task text (Claude's internal agents)

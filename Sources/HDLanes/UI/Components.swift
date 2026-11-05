@@ -146,3 +146,38 @@ enum Panels {
         return await model.addProjectReturningID(path: url.path)
     }
 }
+
+/// Empty state sized for side panels: small icon, one 13 pt line, a secondary sentence and at most one
+/// action. `ContentUnavailableView`'s large title is out of scale next to a 13 pt list.
+struct CompactEmptyState: View {
+    let title: String
+    let symbol: String
+    var detail: String?
+    var actionTitle: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 280)
+                    .textSelection(.enabled)
+            }
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .controlSize(.small)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

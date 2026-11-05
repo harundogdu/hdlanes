@@ -67,8 +67,8 @@ private struct SessionHeader: View {
     }
 }
 
-/// Resume when nothing runs in the terminal, Stop while it does. When the agent exited but left its
-/// shell open, both: Resume starts the agent there again, Stop ends the shell.
+/// Stop while something runs in the terminal. Resume lives in the strip above the terminal, which
+/// shows exactly when there is something to resume.
 private struct RunControl: View {
     let session: AgentSession
     @Environment(AppModel.self) private var model
@@ -76,10 +76,6 @@ private struct RunControl: View {
     var body: some View {
         let running = model.isSessionRunning(session.id)
         HStack(spacing: 6) {
-            if !running || model.agentEndedInLiveShell(session.id) {
-                Button(session.provider.isAgent ? L.resume : L.startShell) { model.resumeFromUI(session.id) }
-                    .controlSize(.small)
-            }
             if running {
                 Button(L.stop) { model.stop(session.id) }
                     .controlSize(.small)
