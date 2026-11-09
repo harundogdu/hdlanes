@@ -173,8 +173,8 @@ struct InboxSetupSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
-    /// Groups the user opened or closed, against their default (open when a tool in them is chosen).
-    @State private var toggled: Set<String> = []
+    /// Groups the user opened or closed by hand; others are open when a tool in them is chosen or a search runs.
+    @State private var opened: [String: Bool] = [:]
 
     var body: some View {
         let settings = model.state.settings
@@ -242,6 +242,7 @@ struct InboxSetupSheet: View {
         }
         .padding(16)
         .frame(width: 600, height: 680)
+        .onChange(of: query) { opened.removeAll() }
     }
 
     private var filteredTools: [String] {
@@ -259,11 +260,7 @@ struct InboxSetupSheet: View {
     private func isOpen(_ group: Inbox.ToolGroup) -> Binding<Bool> {
         let c = chosen(group)
         let byDefault = c.read > 0 || c.send || !query.isEmpty
-        return Binding(
-            get: { byDefault != toggled.contains(group.server) },
-            set: { open in
-                if open == byDefault { toggled.remove(group.server) } else { toggled.insert(group.server) }
-            })
+        return Binding(get: { opened[group.server] ?? byDefault }, set: { opened[group.server] = $0 })
     }
 
     private func groupHeader(_ group: Inbox.ToolGroup) -> some View {
@@ -286,6 +283,7 @@ struct InboxSetupSheet: View {
             if !readable.isEmpty {
                 Button(L.inboxSelectReadTools) { selectRead(readable) }
                     .help(L.inboxSelectReadToolsHelp)
+                    .disabled(readable.allSatisfy { model.inboxReadTools.contains($0) || model.inboxSendTool == $0 })
             }
             if c.read > 0 || c.send {
                 Button(L.inboxClearTools) { clear(group) }

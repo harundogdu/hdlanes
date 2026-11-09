@@ -99,6 +99,7 @@ public enum Inbox {
     private static let changeWords: Set<String> = [
         "delete", "remove", "modify", "update", "create", "move", "mark", "archive", "edit", "write", "set",
         "add", "upload", "cancel", "accept", "decline", "trash", "draft", "label", "labels", "batch",
+        "execute", "run", "import", "sync", "export", "publish", "submit", "share",
     ]
     private static let readWords: Set<String> = [
         "search", "list", "get", "read", "find", "fetch", "query", "view", "lookup", "show", "me", "download",

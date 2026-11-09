@@ -99,6 +99,8 @@ struct InboxToolGroupTests {
         #expect(Inbox.toolInfo("mcp__claude_ai_Microsoft_365__outlook_create_draft").kind == .change)
         #expect(Inbox.toolInfo("mcp__claude_ai_Higgsfield__website_secrets").kind == .change)
         #expect(Inbox.toolInfo("mcp__local__read").server == "local")
+        #expect(Inbox.toolInfo("mcp__db__execute_query").kind == .change)
+        #expect(Inbox.toolInfo("mcp__x__export_view").kind == .change)
     }
 
     @Test func messagingServersComeFirst() {

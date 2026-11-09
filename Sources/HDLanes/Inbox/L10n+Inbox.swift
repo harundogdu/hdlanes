@@ -62,7 +62,7 @@ extension L {
     static var inboxToolSearch: String { pick("Find a tool", "Araç bul") }
     static var inboxToolSearchPrompt: String { pick("e.g. mail, search, teams", "ör. mail, search, teams") }
     static func inboxGroupSummary(total: Int, read: Int, send: Bool) -> String {
-        var parts = [pick("\(total) tools", "\(total) araç")]
+        var parts = [pick(total == 1 ? "1 tool" : "\(total) tools", "\(total) araç")]
         if read > 0 { parts.append(pick("\(read) read", "\(read) okuma")) }
         if send { parts.append(pick("sends", "gönderme var")) }
         return parts.joined(separator: " · ")
