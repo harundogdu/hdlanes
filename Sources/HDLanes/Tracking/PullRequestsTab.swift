@@ -6,10 +6,12 @@ import SwiftUI
 struct PullRequestsTab: View {
     let review: (PullRequest) -> Void
     @Environment(AppModel.self) private var model
+    @State private var showOldMine = false
+    @State private var showOldReviews = false
 
     var body: some View {
-        let mine = model.myPullRequests
-        let reviews = model.reviewRequestedPullRequests
+        let mine = PullRequest.activeMine(model.myPullRequests)
+        let reviews = PullRequest.openReviewRequests(model.reviewRequestedPullRequests)
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 ForEach(model.tracking.issues.values.sorted { $0.tool < $1.tool }, id: \.self) { issue in
@@ -23,17 +25,54 @@ struct PullRequestsTab: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
-                TrackingSection(title: L.sectionMine, count: mine.count, empty: L.emptyMyPullRequests, isEmpty: mine.isEmpty) {
-                    RepoGroups(prs: mine, review: review)
+                TrackingSection(title: L.sectionMine, count: mine.shown.count, empty: L.emptyMyPullRequests,
+                                isEmpty: mine.shown.isEmpty && mine.hidden.isEmpty) {
+                    RepoGroups(prs: mine.shown, review: review)
+                    HiddenPullRequests(prs: mine.hidden, label: L.hiddenOldPullRequests, isShown: $showOldMine, review: review)
                 }
-                TrackingSection(title: L.sectionReviewRequested, count: reviews.count, empty: L.emptyReviewRequested,
-                                isEmpty: reviews.isEmpty) {
-                    RepoGroups(prs: reviews, review: review)
+                TrackingSection(title: L.sectionReviewRequested, count: reviews.shown.count, empty: L.emptyReviewRequested,
+                                isEmpty: reviews.shown.isEmpty && reviews.hidden.isEmpty) {
+                    RepoGroups(prs: reviews.shown, review: review)
+                    HiddenPullRequests(prs: reviews.hidden, label: L.hiddenDoneReviews, isShown: $showOldReviews, review: review)
                 }
             }
             .padding(16)
             .frame(maxWidth: 1000, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// "3 older PRs hidden · Show": the trimmed-off PRs, one click away and dimmed when shown.
+private struct HiddenPullRequests: View {
+    let prs: [PullRequest]
+    let label: (Int) -> String
+    @Binding var isShown: Bool
+    let review: (PullRequest) -> Void
+
+    var body: some View {
+        if !prs.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    isShown.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isShown ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                        Text(label(prs.count))
+                        Text(verbatim: "·")
+                        Text(isShown ? L.hide : L.show)
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 6)
+                .padding(.top, 6)
+                if isShown {
+                    RepoGroups(prs: prs, review: review).opacity(0.6)
+                }
+            }
         }
     }
 }

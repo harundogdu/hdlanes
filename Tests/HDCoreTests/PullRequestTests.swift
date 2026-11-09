@@ -306,3 +306,28 @@ struct ReviewPromptTests {
                 == "#5 Add {title} support in a/b: feat/x->main https://github.com/a/b/pull/5 {unknown} {")
     }
 }
+
+struct PullRequestTrimTests {
+    static let now = Date(timeIntervalSince1970: 2_000_000_000)
+
+    static func pr(_ n: Int, daysAgo: Double, mine: Bool = false, vote: PullRequest.Vote = .none) -> PullRequest {
+        PullRequest(id: "github:a/b#\(n)", provider: .github, number: n, title: "t", url: "https://x/\(n)",
+                    repoKey: "github:a/b", repoLabel: "a/b", sourceBranch: "s", targetBranch: "main", author: "x",
+                    isMine: mine, isDraft: false, createdAt: now.addingTimeInterval(-400 * 86_400),
+                    updatedAt: now.addingTimeInterval(-daysAgo * 86_400), reviewRequestedFromMe: !mine, myVote: vote)
+    }
+
+    @Test func reviewRequestsDropVotedAndStale() {
+        let r = PullRequest.openReviewRequests([Self.pr(1, daysAgo: 2), Self.pr(2, daysAgo: 2, vote: .approved),
+                                                Self.pr(3, daysAgo: 45), Self.pr(4, daysAgo: 1, vote: .waiting)], now: Self.now)
+        #expect(r.shown.map(\.number) == [1, 4])
+        #expect(r.hidden.map(\.number) == [2, 3])
+    }
+
+    @Test func mineDropsStale() {
+        let r = PullRequest.activeMine([Self.pr(1, daysAgo: 29, mine: true), Self.pr(2, daysAgo: 31, mine: true)], now: Self.now)
+        #expect(r.shown.map(\.number) == [1] && r.hidden.map(\.number) == [2])
+        #expect(Self.pr(5, daysAgo: 8).isStale(now: Self.now, days: 7))
+        #expect(!Self.pr(5, daysAgo: 6).isStale(now: Self.now, days: 7))
+    }
+}

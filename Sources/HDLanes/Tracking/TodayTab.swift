@@ -29,11 +29,13 @@ struct TodayTab: View {
 
     var body: some View {
         let waiting = (model.sessionsNeedingYou.map { WaitingItem.session($0, since: model.since($0)) }
-            + model.tracking.pullRequests.filter(\.needsMe).map { WaitingItem.pullRequest($0) })
+            + waitingPullRequests.map { WaitingItem.pullRequest($0) })
             .sorted { $0.date < $1.date }
         let working = model.workingSessions
         let finished = model.sessionsFinished(on: Date())
-        let mine = model.myPullRequests
+        // Today: my PRs that moved this week and aren't already listed as waiting.
+        let waitingIDs = Set(waitingPullRequests.map(\.id))
+        let mine = model.myPullRequests.filter { !waitingIDs.contains($0.id) && !$0.isStale(days: 7) }
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 TrackingSection(title: L.sectionWaiting, count: waiting.count, empty: L.emptyWaiting, isEmpty: waiting.isEmpty) {
@@ -73,8 +75,13 @@ struct TodayTab: View {
         }
         .task(id: model.tracking.activityVersion) {
             let log = model.activityLog
-            events = await Task.detached { log.events(on: Date()) }.value
+            // Finished turns are already listed under "Finished today".
+            events = await Task.detached { log.events(on: Date()).filter { $0.kind != .turnDone } }.value
         }
+    }
+
+    private var waitingPullRequests: [PullRequest] {
+        model.tracking.pullRequests.filter { $0.needsMe && !$0.isStale(days: PullRequest.staleDays) }
     }
 
     @ViewBuilder
