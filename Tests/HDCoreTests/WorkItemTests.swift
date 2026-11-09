@@ -37,14 +37,20 @@ struct WorkItemTests {
     }
 
     @Test func queries() throws {
-        #expect(WorkItemQuery.mine().contains("[System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"))
-        #expect(WorkItemQuery.assigned(to: ["", "a\nb"]) == nil)
-        let team = try #require(WorkItemQuery.assigned(to: ["ada@example.com", "O'Brien"]))
-        #expect(team.contains("[System.AssignedTo] IN ('ada@example.com', 'O''Brien')"))
+        let mine = try #require(WorkItemQuery.mine(project: "Main Board"))
+        #expect(mine.contains("WHERE [System.TeamProject] = 'Main Board' AND [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"))
+        #expect(WorkItemQuery.mine(project: "a\nb") == nil)
+        #expect(WorkItemQuery.assigned(to: ["", "a\nb"], project: "P") == nil)
+        let team = try #require(WorkItemQuery.assigned(to: ["ada@example.com", "O'Brien"], project: "P"))
+        #expect(team.contains("[System.TeamProject] = 'P' AND [System.AssignedTo] IN ('ada@example.com', 'O''Brien')"))
         #expect(team.contains("[System.ChangedDate] >= @Today - 30"))
-        #expect(WorkItemQuery.stateChanged(people: []).contains("WHERE [System.AssignedTo] = @Me AND [Microsoft.VSTS.Common.StateChangeDate] >= @Today - 1"))
-        #expect(WorkItemQuery.stateChanged(people: ["ada@example.com"])
+        #expect(try #require(WorkItemQuery.stateChanged(people: [], project: "P"))
+            .contains("WHERE [System.TeamProject] = 'P' AND [System.AssignedTo] = @Me AND [Microsoft.VSTS.Common.StateChangeDate] >= @Today - 1"))
+        #expect(try #require(WorkItemQuery.stateChanged(people: ["ada@example.com"], project: "P"))
             .contains("([System.AssignedTo] = @Me OR [System.AssignedTo] IN ('ada@example.com'))"))
+        // A string-shaped assignee (older API versions) still parses.
+        let old = #"[{"id": 3, "fields": {"System.Title": "x", "System.State": "New", "System.WorkItemType": "Task", "System.AssignedTo": "Ada <ada@example.com>"}}]"#
+        #expect(WorkItemQuery.parse(Data(old.utf8), org: "o", project: "p")?.first?.assignedTo == "Ada <ada@example.com>")
     }
 
     @Test func staleAndStateOrder() {

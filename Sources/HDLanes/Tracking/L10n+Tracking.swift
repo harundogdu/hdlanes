@@ -174,6 +174,7 @@ extension L {
     }
     static var workItemsPersonPrompt: String { pick("e-mail or name", "e-posta ya da ad") }
     static var workItemsSuggestions: String { pick("Seen in your PRs and boards", "PR'larında ve panolarda görülenler") }
+    static var openWorkItemHelp: String { pick("Open the work item in the browser", "İşi tarayıcıda aç") }
     static var workItemUnassigned: String { pick("unassigned", "atanmamış") }
     static func workItemChangedBy(_ name: String) -> String { pick("last changed by \(name)", "son değiştiren \(name)") }
     static func workItemsIssue(_ issue: PRIssue) -> String {

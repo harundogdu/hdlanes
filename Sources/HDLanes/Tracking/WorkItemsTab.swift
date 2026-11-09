@@ -1,7 +1,7 @@
 import HDCore
 import SwiftUI
 
-// OWNER: tracking area. "İşler": Azure Boards items: today's state changes, mine by state, my teammates'.
+// OWNER: tracking area. The Work Items tab: Azure Boards items: today's state changes, mine by state, my teammates'.
 
 struct WorkItemsTab: View {
     @Environment(AppModel.self) private var model
@@ -148,7 +148,7 @@ private struct WorkItemRow: View {
             by?.nilIfBlank.map(L.workItemChangedBy),
         ]
         TrackingRow(title: item.title, subtitle: parts.compactMap { $0 }.joined(separator: " · "),
-                    help: L.openInBrowserHelp, action: { model.openInBrowser(item.webURL) }) {
+                    help: L.openWorkItemHelp, action: { model.openInBrowser(item.webURL) }) {
             Image(systemName: symbol).foregroundStyle(.secondary).font(.system(size: 11))
         } trailing: {
             HStack(spacing: 8) {

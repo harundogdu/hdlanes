@@ -353,7 +353,8 @@ in the last 7 days and aren't already under waiting; the flow leaves out `turnDo
 Azure Boards items for every Azure DevOps (org, project) the projects' `origin` remotes point at, read
 only while the **Work Items** tab is open (on opening, every 5 minutes, and when the people list changes).
 Per project, `az boards query --org … --project … --detect false -o json --wiql …` (60 s timeout), three
-WIQL queries: mine open (`[System.AssignedTo] = @Me`, state not Closed/Done/Removed); teammates' open items
+WIQL queries, each with `[System.TeamProject] = '<project>'` (raw WIQL isn't scoped by `--project`, and
+`@project` matched nothing through `az`; verified live): mine open (`[System.AssignedTo] = @Me`, state not Closed/Done/Removed); teammates' open items
 changed in the last 30 days; state changed since yesterday (`Microsoft.VSTS.Common.StateChangeDate >=
 @Today - 1`) for me and teammates. Teammates are `AppSettings.trackedPeople` (email / unique name or display
 name, both match `[System.AssignedTo]`; verified live), edited in the tab's People… sheet, with suggestions
@@ -361,7 +362,9 @@ from Azure PR authors and seen assignees. Names become WIQL literals via `WorkIt
 control characters and brackets rejected). Mine is grouped by state (in-flight states first, not-started
 last), five rows per group, and items unchanged for 30 days sit behind a Show line. "Changed by" is the
 last changer, not necessarily who moved the state; old → new state needs the updates API (not read).
-Rows open `https://dev.azure.com/{org}/{project}/_workitems/edit/{id}`. A failed read keeps the last lists.
+Rows open `https://dev.azure.com/{org}/{project}/_workitems/edit/{id}`. A list (mine / teammates /
+changed) with any failed read keeps what it showed; a newer refresh (people changed) supersedes a running
+one by generation, and a cancelled one writes nothing.
 
 **Read-only rule.** Tracking never comments, votes, approves, completes, pushes or edits a PR. The only
 writes are local: the review worktree and session, the activity log and saved reports

@@ -40,6 +40,7 @@ final class TrackingStore {
     var changedWorkItems: [WorkItem] = []
     var workItemsIssue: PRIssue?
     var isLoadingWorkItems = false
+    @ObservationIgnored var workItemsGeneration = 0
     var workItemsLoadedAt: Date?
     /// Azure DevOps (org, project) pairs found in the projects' remotes, from the last work-item read.
     var workItemProjects: [String] = []

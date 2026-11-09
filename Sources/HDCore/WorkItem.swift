@@ -71,7 +71,7 @@ public enum WorkItemQuery {
     /// Days of state changes the "changed" section looks back.
     public static let changedWindowDays = 1
 
-    static let fields = "[System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo], "
+    static let fields = "[System.Id], [System.TeamProject], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo], "
         + "[System.ChangedBy], [System.ChangedDate], [Microsoft.VSTS.Common.StateChangeDate]"
 
     private static var open: String {
@@ -92,22 +92,31 @@ public enum WorkItemQuery {
         return lits.isEmpty ? nil : "[System.AssignedTo] IN (" + lits.joined(separator: ", ") + ")"
     }
 
-    /// My open items, most recently changed first.
-    public static func mine() -> String {
-        "SELECT \(fields) FROM WorkItems WHERE [System.AssignedTo] = @Me AND \(open) ORDER BY [System.ChangedDate] DESC"
+    /// Raw WIQL isn't limited to the project in the request (and `@project` matches nothing through
+    /// `az boards query`), so every query names its project. nil for a name that can't be a literal.
+    private static func scope(_ project: String) -> String? {
+        literal(project).map { "[System.TeamProject] = \($0)" }
+    }
+
+    /// My open items in `project`, most recently changed first.
+    public static func mine(project: String) -> String? {
+        guard let p = scope(project) else { return nil }
+        return "SELECT \(fields) FROM WorkItems WHERE \(p) AND [System.AssignedTo] = @Me AND \(open) "
+            + "ORDER BY [System.ChangedDate] DESC"
     }
 
     /// Open items of `people` changed in the last `peopleWindowDays` days. nil when no name is usable.
-    public static func assigned(to list: [String]) -> String? {
-        guard let who = people(list) else { return nil }
-        return "SELECT \(fields) FROM WorkItems WHERE \(who) AND \(open) "
+    public static func assigned(to list: [String], project: String) -> String? {
+        guard let p = scope(project), let who = people(list) else { return nil }
+        return "SELECT \(fields) FROM WorkItems WHERE \(p) AND \(who) AND \(open) "
             + "AND [System.ChangedDate] >= @Today - \(peopleWindowDays) ORDER BY [System.ChangedDate] DESC"
     }
 
     /// Items of mine or of `people` whose state changed in the last `changedWindowDays` days, finished ones included.
-    public static func stateChanged(people list: [String]) -> String {
+    public static func stateChanged(people list: [String], project: String) -> String? {
+        guard let p = scope(project) else { return nil }
         let who = people(list).map { "([System.AssignedTo] = @Me OR \($0))" } ?? "[System.AssignedTo] = @Me"
-        return "SELECT \(fields) FROM WorkItems WHERE \(who) "
+        return "SELECT \(fields) FROM WorkItems WHERE \(p) AND \(who) "
             + "AND [Microsoft.VSTS.Common.StateChangeDate] >= @Today - \(changedWindowDays) "
             + "ORDER BY [Microsoft.VSTS.Common.StateChangeDate] DESC"
     }
@@ -132,10 +141,15 @@ public enum WorkItemQuery {
         }
     }
 
+    nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    nonisolated(unsafe) private static let plain = ISO8601DateFormatter()
+
     static func date(_ value: Any?) -> Date? {
         guard let s = value as? String else { return nil }
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return withFraction.date(from: s) ?? ISO8601DateFormatter().date(from: s)
+        return fractional.date(from: s) ?? plain.date(from: s)
     }
 }
