@@ -54,17 +54,26 @@ public enum AccountCLI {
 
     /// A shell line that runs the vendor CLI as the account even if the user's shell init exports
     /// credentials: `env -u … [CLAUDE_CONFIG_DIR='<dir>'] claude 'auth' 'status' '--json'`. A non-empty
-    /// `configDir` means a managed account (system default accounts pass nil).
-    public static func commandLine(provider: Provider, configDir: String?, arguments: [String]) -> String {
+    /// `configDir` means a managed account (system default accounts pass nil). `variables` are set on the
+    /// same line, after the shell profile has run; names that aren't `[A-Z0-9_]+` are dropped.
+    public static func commandLine(provider: Provider, configDir: String?, arguments: [String],
+                                   variables: [String: String] = [:]) -> String {
         var parts = ["env"]
         let managed = !(configDir ?? "").isEmpty
         for v in strippedVariables(for: provider, managedAccount: managed) { parts += ["-u", v] }
         if let variable = dirVariable(for: provider), let configDir, !configDir.isEmpty {
             parts.append("\(variable)=\(quote(configDir))")
         }
+        for (name, value) in variables.sorted(by: { $0.key < $1.key }) where isVariableName(name) {
+            parts.append("\(name)=\(quote(value))")
+        }
         parts.append(provider == .codex ? "codex" : "claude")
         parts += arguments.map(quote)
         return parts.joined(separator: " ")
+    }
+
+    static func isVariableName(_ name: String) -> Bool {
+        !name.isEmpty && name.unicodeScalars.allSatisfy { ("A"..."Z").contains($0) || ("0"..."9").contains($0) || $0 == "_" }
     }
 
     /// Exit status / output that means the shell couldn't find the CLI at all.

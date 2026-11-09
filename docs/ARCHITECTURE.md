@@ -400,7 +400,9 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
 - **Setup.** Pick the account, then **Load Tools**: one `claude -p --output-format stream-json --verbose
   --model haiku --tools "" --permission-mode dontAsk` run whose first line (`system/init`) lists the
   `mcp__…` tool names and each MCP server's status; servers that aren't `connected` (`needs-auth`) are
-  named with how to sign in. The user marks tools as Read or Send (one Send tool). Stored in
+  named with how to sign in. Every inbox run sets `MCP_CONNECTION_NONBLOCKING=false` on the command line:
+  since claude 2.1.319 claude.ai connectors connect in the background, so without it the init line (and
+  the first turn) come before their tools. The user marks tools as Read or Send (one Send tool). Stored in
   `AppSettings.inbox*`; names must be plain `mcp__[A-Za-z0-9_-]+` so they can't widen `--allowedTools`.
 - **Refresh** (click only): `claude -p --output-format json --model sonnet --no-session-persistence
   --tools "" --permission-mode dontAsk --allowedTools <read tools> --disable-slash-commands`, prompt on

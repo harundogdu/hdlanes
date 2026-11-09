@@ -144,11 +144,13 @@ extension AppModel {
     /// Runs the account's vendor CLI with `arguments` through the login shell, with the account's
     /// environment and the user's resolved PATH. Credential variables are unset in the command line
     /// too, in case the user's shell profile exports them.
-    func runAccountCLI(_ account: Account, arguments: [String], stdin: Data? = nil, timeout: TimeInterval) async -> CLIResult {
+    func runAccountCLI(_ account: Account, arguments: [String], variables: [String: String] = [:], stdin: Data? = nil,
+                       timeout: TimeInterval) async -> CLIResult {
         let dir = account.isSystemDefault ? nil : account.configDir
         let path = await ShellPath.resolved(base: environment(for: nil))
         let env = AccountCLI.environment(base: environment(for: account), provider: account.provider, configDir: dir, path: path)
-        let line = AccountCLI.commandLine(provider: account.provider, configDir: dir, arguments: arguments)
+        let line = AccountCLI.commandLine(provider: account.provider, configDir: dir, arguments: arguments,
+                                              variables: variables)
         return await CLIRunner.runShell(line, environment: env, currentDirectory: accountCLIDirectory(), stdin: stdin, timeout: timeout)
     }
 

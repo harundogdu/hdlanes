@@ -18,7 +18,7 @@ extension AppModel {
         inbox.isLoadingTools = true
         inbox.toolsError = nil
         defer { inbox.isLoadingTools = false }
-        let result = await runAccountCLI(account, arguments: Inbox.toolListArguments,
+        let result = await runAccountCLI(account, arguments: Inbox.toolListArguments, variables: Inbox.variables,
                                          stdin: Data("Reply with OK.".utf8), timeout: 90)
         if let problem = cliProblem(result) {
             inbox.toolsError = problem
@@ -51,7 +51,7 @@ extension AppModel {
         defer { inbox.isRefreshing = false }
         let prompt = Inbox.fetchPrompt(focus: state.settings.inboxFocus ?? "", hours: state.settings.inboxHours ?? 24,
                                        language: L.isTurkish ? "Turkish" : "English")
-        let result = await runAccountCLI(account, arguments: args, stdin: Data(prompt.utf8), timeout: 300)
+        let result = await runAccountCLI(account, arguments: args, variables: Inbox.variables, stdin: Data(prompt.utf8), timeout: 300)
         if let problem = cliProblem(result) {
             inbox.error = problem
             return
@@ -74,7 +74,7 @@ extension AppModel {
         inbox.sending.insert(item.id)
         inbox.sendErrors[item.id] = nil
         defer { inbox.sending.remove(item.id) }
-        let result = await runAccountCLI(account, arguments: args,
+        let result = await runAccountCLI(account, arguments: args, variables: Inbox.variables,
                                          stdin: Data(Inbox.sendPrompt(item: item, reply: text).utf8), timeout: 180)
         if result.timedOut {
             // The tool may have fired before the timeout; hide the item so it isn't sent twice.
