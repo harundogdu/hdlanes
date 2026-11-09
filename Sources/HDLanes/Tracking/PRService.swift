@@ -81,9 +81,9 @@ enum PRService {
         return env
     }
 
-    static func runAZ(_ args: [String]) async -> Result<String, PRIssue> {
+    static func runAZ(_ args: [String], timeout: TimeInterval = timeout) async -> Result<String, PRIssue> {
         guard let az = await AzureCLI.shared.path() else { return .failure(.cliMissing("az")) }
-        return await run(az, args, environment: azEnvironment(), directory: nil, tool: "az")
+        return await run(az, args, environment: azEnvironment(), directory: nil, tool: "az", timeout: timeout)
     }
 
     static func runGH(_ args: [String], in dir: String?) async -> Result<String, PRIssue> {
@@ -92,7 +92,7 @@ enum PRService {
     }
 
     private static func run(_ exe: String, _ args: [String], environment: [String: String], directory: String?,
-                            tool: String) async -> Result<String, PRIssue> {
+                            tool: String, timeout: TimeInterval = timeout) async -> Result<String, PRIssue> {
         let name = tool + " " + args.prefix(3).joined(separator: " ")
         do {
             let r = try await ProcessRunner.run(exe, args, environment: environment, currentDirectory: directory,

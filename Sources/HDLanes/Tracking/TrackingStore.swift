@@ -3,7 +3,7 @@ import HDCore
 import Observation
 
 enum TrackingTab: String, CaseIterable, Identifiable {
-    case today, pullRequests, daySummary
+    case today, pullRequests, workItems, daySummary
     var id: String { rawValue }
 }
 
@@ -33,4 +33,14 @@ final class TrackingStore {
     @ObservationIgnored var awaitingResult: Set<UUID> = []
 
     var hasPullRequestSources: Bool { !projectRepoKeys.isEmpty }
+
+    // Work items (Azure Boards), read only while the Work items tab is open.
+    var myWorkItems: [WorkItem] = []
+    var teamWorkItems: [WorkItem] = []
+    var changedWorkItems: [WorkItem] = []
+    var workItemsIssue: PRIssue?
+    var isLoadingWorkItems = false
+    var workItemsLoadedAt: Date?
+    /// Azure DevOps (org, project) pairs found in the projects' remotes, from the last work-item read.
+    var workItemProjects: [String] = []
 }

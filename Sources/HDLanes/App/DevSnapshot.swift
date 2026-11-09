@@ -29,6 +29,7 @@ enum DevSnapshot {
             }
         }
         steps.append(("tracking", { model.selection = .tracking }))
+        steps.append(("tracking-work-items", { model.tracking.tab = .workItems }))
         steps.append(("inbox", { model.selection = .inbox }))
         steps.append(("board", { model.selection = .board }))
         // The Settings scene doesn't open from here; host the same view in a window of our own.
@@ -57,7 +58,8 @@ enum DevSnapshot {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             let (name, action) = steps[index]
             action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // Work items wait on `az boards query` calls.
+            DispatchQueue.main.asyncAfter(deadline: .now() + (name == "tracking-work-items" ? 60 : 1.5)) {
                 let window = name.hasPrefix("settings")
                     ? NSApp.windows.first { $0.identifier?.rawValue == "dev-settings" }
                     : NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
