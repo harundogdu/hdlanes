@@ -81,7 +81,7 @@ struct TodayTab: View {
     }
 
     private var waitingPullRequests: [PullRequest] {
-        model.tracking.pullRequests.filter { $0.needsMe && !$0.isStale(days: PullRequest.staleDays) }
+        model.tracking.pullRequests.filter { $0.isWaitingForMe() }
     }
 
     @ViewBuilder

@@ -43,7 +43,7 @@ struct PullRequestsTab: View {
     }
 }
 
-/// "3 older PRs hidden · Show": the trimmed-off PRs, one click away and dimmed when shown.
+/// The trimmed-off PRs behind a "N … · Show" line, one click away and dimmed when shown.
 private struct HiddenPullRequests: View {
     let prs: [PullRequest]
     let label: (Int) -> String

@@ -310,11 +310,11 @@ struct ReviewPromptTests {
 struct PullRequestTrimTests {
     static let now = Date(timeIntervalSince1970: 2_000_000_000)
 
-    static func pr(_ n: Int, daysAgo: Double, mine: Bool = false, vote: PullRequest.Vote = .none) -> PullRequest {
+    static func pr(_ n: Int, daysAgo: Double?, mine: Bool = false, vote: PullRequest.Vote = .none) -> PullRequest {
         PullRequest(id: "github:a/b#\(n)", provider: .github, number: n, title: "t", url: "https://x/\(n)",
                     repoKey: "github:a/b", repoLabel: "a/b", sourceBranch: "s", targetBranch: "main", author: "x",
                     isMine: mine, isDraft: false, createdAt: now.addingTimeInterval(-400 * 86_400),
-                    updatedAt: now.addingTimeInterval(-daysAgo * 86_400), reviewRequestedFromMe: !mine, myVote: vote)
+                    updatedAt: daysAgo.map { now.addingTimeInterval(-$0 * 86_400) }, reviewRequestedFromMe: !mine, myVote: vote)
     }
 
     @Test func reviewRequestsDropVotedAndStale() {
@@ -329,5 +329,18 @@ struct PullRequestTrimTests {
         #expect(r.shown.map(\.number) == [1] && r.hidden.map(\.number) == [2])
         #expect(Self.pr(5, daysAgo: 8).isStale(now: Self.now, days: 7))
         #expect(!Self.pr(5, daysAgo: 6).isStale(now: Self.now, days: 7))
+    }
+
+    @Test func unknownUpdateTimeIsNeverStale() {
+        // Azure lists have no update time; a PR created 400 days ago stays.
+        #expect(!Self.pr(1, daysAgo: nil, mine: true).isStale(now: Self.now, days: 7))
+        #expect(PullRequest.openReviewRequests([Self.pr(2, daysAgo: nil), Self.pr(3, daysAgo: nil, vote: .approved)],
+                                               now: Self.now).shown.map(\.number) == [2])
+        // Waiting needs both: something for me to do and recent activity.
+        var conflict = Self.pr(4, daysAgo: 40, mine: true)
+        conflict.mergeable = .conflict
+        #expect(conflict.needsMe && !conflict.isWaitingForMe(now: Self.now))
+        conflict.updatedAt = Self.now
+        #expect(conflict.isWaitingForMe(now: Self.now))
     }
 }

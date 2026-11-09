@@ -222,7 +222,7 @@ extension AppModel {
 
     /// Badge on the sidebar row: sessions needing the user plus PRs that need them.
     var trackingAttentionCount: Int {
-        visibleSessions.filter { needsAttention(liveStatus($0.id)) }.count + tracking.pullRequests.filter(\.needsMe).count
+        visibleSessions.filter { needsAttention(liveStatus($0.id)) }.count + tracking.pullRequests.filter { $0.isWaitingForMe() }.count
     }
 
     func attentionReason(_ s: AgentSession) -> String {
@@ -253,7 +253,7 @@ extension AppModel {
             DaySummary.Item(text: $0.title, detail: attentionReason($0))
         }
         stillOpen += workingSessions.map { DaySummary.Item(text: $0.title, detail: L.statusText(.working)) }
-        stillOpen += tracking.pullRequests.filter(\.needsMe).map {
+        stillOpen += tracking.pullRequests.filter { $0.isWaitingForMe() }.map {
             DaySummary.Item(text: "\($0.title) #\($0.number)", detail: $0.reasons.map(L.prReason).joined(separator: ", "), url: $0.url)
         }
         let tomorrow = state.tasks.filter { $0.status == .active || $0.status == .review }

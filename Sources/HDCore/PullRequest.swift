@@ -160,12 +160,15 @@ public struct PullRequest: Identifiable, Hashable, Sendable {
 
     public var needsMe: Bool { !reasons.isEmpty }
 
-    public var lastActivity: Date { updatedAt ?? createdAt }
-
-    /// No activity for `days` days.
+    /// No activity for `days` days. Azure lists carry no update time: an unknown time is never stale, so an
+    /// old PR with recent pushes isn't hidden for its age.
     public func isStale(now: Date = Date(), days: Int) -> Bool {
-        now.timeIntervalSince(lastActivity) > Double(days) * 86_400
+        guard let updatedAt else { return false }
+        return now.timeIntervalSince(updatedAt) > Double(days) * 86_400
     }
+
+    /// Needs the user and moved recently: what Today's Waiting, the sidebar badge and the day summary count.
+    public func isWaitingForMe(now: Date = Date()) -> Bool { needsMe && !isStale(now: now, days: Self.staleDays) }
 
     /// Days without activity after which a PR leaves the lists (it stays one click away).
     public static let staleDays = 30
