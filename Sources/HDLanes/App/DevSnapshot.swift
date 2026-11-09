@@ -37,6 +37,19 @@ enum DevSnapshot {
                                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
         settingsWindow.identifier = NSUserInterfaceItemIdentifier("dev-settings")
         settingsWindow.isReleasedWhenClosed = false
+        // Inbox setup with a made-up tool list (the test home has no connectors).
+        steps.append(("settings-inbox-setup", {
+            let m365 = ["chat_message_search", "get_me", "outlook_email_search", "read_resource", "outlook_send_mail",
+                        "outlook_create_draft", "outlook_batch_delete_messages", "teams_list_chats", "find_meeting_availability"]
+            model.inbox.availableTools = m365.map { "mcp__claude_ai_Microsoft_365__" + $0 }
+                + ["mcp__claude_ai_Gmail__search_threads", "mcp__claude_ai_Gmail__get_thread", "mcp__claude_ai_Gmail__create_draft",
+                   "mcp__claude_ai_Figma__get_file", "mcp__claude_ai_Higgsfield__website_secrets"]
+            model.updateSettings { $0.inboxReadTools = ["mcp__claude_ai_Microsoft_365__outlook_email_search"] }
+            settingsWindow.setContentSize(NSSize(width: 600, height: 680))
+            settingsWindow.contentView = NSHostingView(rootView: InboxSetupSheet().environment(model))
+            settingsWindow.center()
+            settingsWindow.orderFront(nil)
+        }))
         for tab in ["general", "terminal", "accounts", "connections", "tasks"] {
             steps.append(("settings-\(tab)", {
                 defaults.set(tab, forKey: "hd.settingsTab")

@@ -189,4 +189,13 @@ extension L {
     }
     static func showMore(_ n: Int) -> String { pick("\(n) more", "\(n) tane daha") }
     static var showFewer: String { pick("Show fewer", "Daha az göster") }
+    static func hiddenOldPullRequests(_ n: Int) -> String {
+        pick("\(n) with no activity for \(PullRequest.staleDays) days", "\(PullRequest.staleDays) gündür hareketsiz \(n) PR")
+    }
+    static func hiddenDoneReviews(_ n: Int) -> String {
+        pick("\(n) already voted on or with no activity for \(PullRequest.staleDays) days",
+             "Oy verdiğin ya da \(PullRequest.staleDays) gündür hareketsiz \(n) PR")
+    }
+    static var show: String { pick("Show", "Göster") }
+    static var hide: String { pick("Hide", "Gizle") }
 }
