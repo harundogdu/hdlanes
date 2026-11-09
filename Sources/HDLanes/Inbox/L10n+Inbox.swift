@@ -59,6 +59,25 @@ extension L {
     static var inboxRead: String { pick("Read", "Okuma") }
     static var inboxSendRole: String { pick("Send", "Gönderme") }
     static var inboxToolUnused: String { pick("Not used", "Kullanılmaz") }
+    static var inboxToolSearch: String { pick("Find a tool", "Araç bul") }
+    static var inboxToolSearchPrompt: String { pick("e.g. mail, search, teams", "ör. mail, search, teams") }
+    static func inboxGroupSummary(total: Int, read: Int, send: Bool) -> String {
+        var parts = [pick("\(total) tools", "\(total) araç")]
+        if read > 0 { parts.append(pick("\(read) read", "\(read) okuma")) }
+        if send { parts.append(pick("sends", "gönderme var")) }
+        return parts.joined(separator: " · ")
+    }
+    static var inboxSelectReadTools: String { pick("Select readers", "Okuyanları seç") }
+    static var inboxSelectReadToolsHelp: String {
+        pick("Marks every tool here whose name says it only reads (search, list, get…) as Read.",
+             "Buradaki, adına göre yalnız okuyan (search, list, get…) bütün araçları Okuma yapar.")
+    }
+    static var inboxClearTools: String { pick("Clear", "Temizle") }
+    static func inboxChangeTools(_ n: Int) -> String { pick("Tools that change things (\(n))", "Değişiklik yapan araçlar (\(n))") }
+    static var inboxChangeToolsHelp: String {
+        pick("Delete, edit, create, move… Not needed to read the inbox.",
+             "Silme, düzenleme, oluşturma, taşıma… Gelen kutusunu okumak için gerekmez.")
+    }
     static var inboxFocusLabel: String { pick("What matters to you (optional)", "Senin için önemli olan (isteğe bağlı)") }
     static var inboxFocusPrompt: String {
         pick("e.g. review requests, questions from my team, my projects", "ör. review istekleri, ekibimden sorular, projelerim")

@@ -77,6 +77,71 @@ public enum Inbox {
     /// What the user lets a tool do in the inbox.
     public enum ToolRole: Equatable, Sendable { case read, send, unused }
 
+    /// What a tool's name says it does, for grouping the setup list. Only a hint: the user still picks roles.
+    public enum ToolKind: Equatable, Sendable { case read, send, change }
+
+    /// An MCP tool name split for display: `mcp__claude_ai_Microsoft_365__outlook_send_mail` →
+    /// server "Microsoft 365", action "Outlook send mail".
+    public struct ToolInfo: Hashable, Sendable {
+        public let name: String
+        public let server: String
+        public let action: String
+        public let kind: ToolKind
+    }
+
+    public struct ToolGroup: Hashable, Sendable, Identifiable {
+        public var id: String { server }
+        public let server: String
+        public let tools: [ToolInfo]
+    }
+
+    private static let sendWords: Set<String> = ["send", "reply", "forward", "post", "respond"]
+    private static let changeWords: Set<String> = [
+        "delete", "remove", "modify", "update", "create", "move", "mark", "archive", "edit", "write", "set",
+        "add", "upload", "cancel", "accept", "decline", "trash", "draft", "label", "labels", "batch",
+    ]
+    private static let readWords: Set<String> = [
+        "search", "list", "get", "read", "find", "fetch", "query", "view", "lookup", "show", "me", "download",
+    ]
+    private static let messagingWords = ["mail", "outlook", "microsoft", "gmail", "slack", "teams", "chat", "message"]
+
+    public static func toolInfo(_ name: String) -> ToolInfo {
+        var rest = Substring(name)
+        if rest.hasPrefix("mcp__") { rest = rest.dropFirst(5) }
+        let serverPart: Substring
+        let actionPart: Substring
+        if let r = rest.range(of: "__") {
+            serverPart = rest[..<r.lowerBound]
+            actionPart = rest[r.upperBound...]
+        } else {
+            serverPart = rest
+            actionPart = rest
+        }
+        var server = String(serverPart)
+        if server.hasPrefix("claude_ai_") { server.removeFirst("claude_ai_".count) }
+        server = server.replacingOccurrences(of: "_", with: " ")
+        let words = actionPart.lowercased().split(whereSeparator: { $0 == "_" || $0 == "-" }).map(String.init)
+        let kind: ToolKind
+        if words.contains(where: sendWords.contains) { kind = .send }
+        else if words.contains(where: changeWords.contains) { kind = .change }
+        else if words.contains(where: readWords.contains) { kind = .read }
+        else { kind = .change }
+        let joined = words.joined(separator: " ")
+        let action = joined.prefix(1).uppercased() + joined.dropFirst()
+        return ToolInfo(name: name, server: server, action: action, kind: kind)
+    }
+
+    /// Tools grouped by server: mail and chat servers first, then by name; tools by action.
+    public static func groups(_ tools: [String]) -> [ToolGroup] {
+        let infos = Dictionary(grouping: tools.map(toolInfo), by: \.server)
+        func messaging(_ s: String) -> Bool { messagingWords.contains { s.lowercased().contains($0) } }
+        return infos.map { ToolGroup(server: $0.key, tools: $0.value.sorted { $0.action < $1.action }) }
+            .sorted {
+                let (a, b) = (messaging($0.server), messaging($1.server))
+                return a != b ? a : $0.server.localizedCaseInsensitiveCompare($1.server) == .orderedAscending
+            }
+    }
+
     /// Tool names are passed to `--allowedTools` verbatim; anything else could widen the allowance.
     public static func isPlainToolName(_ tool: String) -> Bool {
         !tool.isEmpty && tool.hasPrefix("mcp__") && tool.unicodeScalars.allSatisfy {

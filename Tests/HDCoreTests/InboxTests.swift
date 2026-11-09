@@ -88,3 +88,23 @@ struct InboxTests {
         #expect(!Inbox.sendSucceeded("FAILED: no permission"))
     }
 }
+
+struct InboxToolGroupTests {
+    @Test func toolNamesSplitIntoServerAndAction() {
+        let t = Inbox.toolInfo("mcp__claude_ai_Microsoft_365__outlook_send_mail")
+        #expect(t.server == "Microsoft 365" && t.action == "Outlook send mail" && t.kind == .send)
+        #expect(Inbox.toolInfo("mcp__claude_ai_Microsoft_365__chat_message_search").kind == .read)
+        #expect(Inbox.toolInfo("mcp__claude_ai_Microsoft_365__get_me").kind == .read)
+        #expect(Inbox.toolInfo("mcp__claude_ai_Microsoft_365__outlook_batch_delete_messages").kind == .change)
+        #expect(Inbox.toolInfo("mcp__claude_ai_Microsoft_365__outlook_create_draft").kind == .change)
+        #expect(Inbox.toolInfo("mcp__claude_ai_Higgsfield__website_secrets").kind == .change)
+        #expect(Inbox.toolInfo("mcp__local__read").server == "local")
+    }
+
+    @Test func messagingServersComeFirst() {
+        let g = Inbox.groups(["mcp__claude_ai_Figma__get_file", "mcp__claude_ai_Gmail__search_threads",
+                              "mcp__claude_ai_Gmail__get_thread", "mcp__claude_ai_Asana__list"])
+        #expect(g.map(\.server) == ["Gmail", "Asana", "Figma"])
+        #expect(g[0].tools.map(\.action) == ["Get thread", "Search threads"])
+    }
+}
