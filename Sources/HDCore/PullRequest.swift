@@ -160,6 +160,35 @@ public struct PullRequest: Identifiable, Hashable, Sendable {
 
     public var needsMe: Bool { !reasons.isEmpty }
 
+    /// No activity for `days` days. Azure lists carry no update time: an unknown time is never stale, so an
+    /// old PR with recent pushes isn't hidden for its age.
+    public func isStale(now: Date = Date(), days: Int) -> Bool {
+        guard let updatedAt else { return false }
+        return now.timeIntervalSince(updatedAt) > Double(days) * 86_400
+    }
+
+    /// Needs the user and moved recently: what Today's Waiting, the sidebar badge and the day summary count.
+    public func isWaitingForMe(now: Date = Date()) -> Bool { needsMe && !isStale(now: now, days: Self.staleDays) }
+
+    /// Days without activity after which a PR leaves the lists (it stays one click away).
+    public static let staleDays = 30
+
+    /// Review requests the user still has to act on: not voted on yet and not stale.
+    public static func openReviewRequests(_ prs: [PullRequest], now: Date = Date()) -> (shown: [PullRequest], hidden: [PullRequest]) {
+        split(prs) { ($0.myVote == .none || $0.myVote == .waiting) && !$0.isStale(now: now, days: staleDays) }
+    }
+
+    /// The user's own PRs with activity in the last `staleDays` days.
+    public static func activeMine(_ prs: [PullRequest], now: Date = Date()) -> (shown: [PullRequest], hidden: [PullRequest]) {
+        split(prs) { !$0.isStale(now: now, days: staleDays) }
+    }
+
+    private static func split(_ prs: [PullRequest], _ keep: (PullRequest) -> Bool) -> (shown: [PullRequest], hidden: [PullRequest]) {
+        var shown: [PullRequest] = [], hidden: [PullRequest] = []
+        for pr in prs { if keep(pr) { shown.append(pr) } else { hidden.append(pr) } }
+        return (shown, hidden)
+    }
+
     /// Merges the same PR seen in two lists (mine and review-requested): flags are OR'ed.
     public func merged(with other: PullRequest) -> PullRequest {
         var m = self

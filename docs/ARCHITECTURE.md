@@ -340,6 +340,15 @@ errors are shown inline per tool. Refresh: once at launch (sidebar row), on open
 3 minutes while it is visible, after `createPullRequest`, and by hand. A PR links to a session when the
 session's project has the same repository and `session.branch == pr.sourceBranch`.
 
+**What the lists leave out.** A PR whose `updatedAt` is more than `PullRequest.staleDays` (30) days ago
+is stale; Azure lists carry no update time, so Azure PRs are never stale (only the vote rule trims them).
+`isWaitingForMe` (`needsMe` and not stale) drives Today's *waiting*, the sidebar badge and the day
+summary alike. PRs tab: *mine* hides stale PRs (`activeMine`); *review
+requested* hides stale PRs and the ones I already voted on (`openReviewRequests`). Hidden PRs sit behind
+a "N … · Show" line. Today tab: *waiting* leaves out stale PRs; *my open PRs* shows only PRs that moved
+in the last 7 days and aren't already under waiting; the flow leaves out `turnDone` (listed under
+*finished today*).
+
 **Read-only rule.** Tracking never comments, votes, approves, completes, pushes or edits a PR. The only
 writes are local: the review worktree and session, the activity log and saved reports
 (`~/.hdlanes/reports/YYYY-MM-DD.md`).

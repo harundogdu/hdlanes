@@ -145,4 +145,14 @@ extension L {
              "Takip'ten başlatılan review oturumlarının ilk istemi. Boşsa varsayılan kullanılır. Yer tutucular: \(placeholders)")
     }
     static var loadingPullRequests: String { pick("Reading pull requests…", "PR'lar okunuyor…") }
+
+    static func hiddenOldPullRequests(_ n: Int) -> String {
+        pick("\(n) with no activity for \(PullRequest.staleDays) days", "\(PullRequest.staleDays) gündür hareketsiz \(n) PR")
+    }
+    static func hiddenDoneReviews(_ n: Int) -> String {
+        pick("\(n) already voted on or with no activity for \(PullRequest.staleDays) days",
+             "Oy verdiğin ya da \(PullRequest.staleDays) gündür hareketsiz \(n) PR")
+    }
+    static var show: String { pick("Show", "Göster") }
+    static var hide: String { pick("Hide", "Gizle") }
 }
