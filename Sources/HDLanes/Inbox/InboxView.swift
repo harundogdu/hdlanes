@@ -169,9 +169,12 @@ private struct InboxItemRow: View {
     }
 }
 
-private struct InboxSetupSheet: View {
+struct InboxSetupSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    /// Groups the user opened or closed by hand; others are open when a tool in them is chosen or a search runs.
+    @State private var opened: [String: Bool] = [:]
 
     var body: some View {
         let settings = model.state.settings
@@ -182,54 +185,53 @@ private struct InboxSetupSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Form {
-                Picker(L.inboxAccountLabel, selection: Binding(
-                    get: { settings.inboxAccount },
-                    set: { id in
-                        guard id != settings.inboxAccount else { return }
-                        // Tool names belong to an account; a new account starts from a fresh list.
-                        model.updateSettings { $0.inboxAccount = id; $0.inboxReadTools = nil; $0.inboxSendTool = nil }
-                        model.inbox.availableTools = []
-                        model.inbox.unavailableServers = []
-                        model.inbox.toolsError = nil
-                    })) {
-                    Text(L.inboxChooseAccount).tag(UUID?.none)
-                    ForEach(model.accounts(for: .claude)) { a in Text(a.label).tag(UUID?.some(a.id)) }
-                }
-                HStack {
-                    Button(L.inboxLoadTools) { Task { await model.loadInboxTools() } }
-                        .disabled(model.inboxAccount == nil || model.inbox.isLoadingTools)
-                        .help(L.inboxLoadToolsHelp)
-                    if model.inbox.isLoadingTools {
-                        ProgressView().controlSize(.small)
-                        Text(L.inboxLoadingTools).font(.system(size: 11)).foregroundStyle(.secondary)
+                Section {
+                    Picker(L.inboxAccountLabel, selection: Binding(
+                        get: { settings.inboxAccount },
+                        set: { id in
+                            guard id != settings.inboxAccount else { return }
+                            // Tool names belong to an account; a new account starts from a fresh list.
+                            model.updateSettings { $0.inboxAccount = id; $0.inboxReadTools = nil; $0.inboxSendTool = nil }
+                            model.inbox.availableTools = []
+                            model.inbox.unavailableServers = []
+                            model.inbox.toolsError = nil
+                        })) {
+                        Text(L.inboxChooseAccount).tag(UUID?.none)
+                        ForEach(model.accounts(for: .claude)) { a in Text(a.label).tag(UUID?.some(a.id)) }
+                    }
+                    HStack {
+                        Button(L.inboxLoadTools) { Task { await model.loadInboxTools() } }
+                            .disabled(model.inboxAccount == nil || model.inbox.isLoadingTools)
+                            .help(L.inboxLoadToolsHelp)
+                        if model.inbox.isLoadingTools {
+                            ProgressView().controlSize(.small)
+                            Text(L.inboxLoadingTools).font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let error = model.inbox.toolsError {
+                        Text(error).font(.system(size: 11)).foregroundStyle(.red)
+                    }
+                    if !model.inbox.unavailableServers.isEmpty {
+                        Text(L.inboxServersUnavailable(model.inbox.unavailableServers))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    TextField(L.inboxFocusLabel, text: Binding(
+                        get: { settings.inboxFocus ?? "" },
+                        set: { v in model.updateSettings { $0.inboxFocus = v.isEmpty ? nil : v } }),
+                              prompt: Text(L.inboxFocusPrompt))
+                    Picker(L.inboxHoursLabel, selection: Binding(
+                        get: { settings.inboxHours ?? 24 },
+                        set: { v in model.updateSettings { $0.inboxHours = v } })) {
+                        ForEach([8, 24, 72], id: \.self) { Text(L.inboxHours($0)).tag($0) }
+                    }
+                    if !toolList.isEmpty {
+                        TextField(L.inboxToolSearch, text: $query, prompt: Text(L.inboxToolSearchPrompt))
                     }
                 }
-                if let error = model.inbox.toolsError {
-                    Text(error).font(.system(size: 11)).foregroundStyle(.red)
-                }
-                if !model.inbox.unavailableServers.isEmpty {
-                    Text(L.inboxServersUnavailable(model.inbox.unavailableServers))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                ForEach(toolList, id: \.self) { tool in
-                    Picker(selection: role(tool)) {
-                        Text(L.inboxToolUnused).tag(Inbox.ToolRole.unused)
-                        Text(L.inboxRead).tag(Inbox.ToolRole.read)
-                        Text(L.inboxSendRole).tag(Inbox.ToolRole.send)
-                    } label: {
-                        Text(tool).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                    }
-                }
-                TextField(L.inboxFocusLabel, text: Binding(
-                    get: { settings.inboxFocus ?? "" },
-                    set: { v in model.updateSettings { $0.inboxFocus = v.isEmpty ? nil : v } }),
-                          prompt: Text(L.inboxFocusPrompt))
-                Picker(L.inboxHoursLabel, selection: Binding(
-                    get: { settings.inboxHours ?? 24 },
-                    set: { v in model.updateSettings { $0.inboxHours = v } })) {
-                    ForEach([8, 24, 72], id: \.self) { Text(L.inboxHours($0)).tag($0) }
+                ForEach(Inbox.groups(filteredTools)) { group in
+                    Section { groupRows(group) } header: { groupHeader(group) }
                 }
             }
             .formStyle(.grouped)
@@ -239,7 +241,109 @@ private struct InboxSetupSheet: View {
             }
         }
         .padding(16)
-        .frame(width: 560, height: 600)
+        .frame(width: 600, height: 680)
+        .onChange(of: query) { opened.removeAll() }
+    }
+
+    private var filteredTools: [String] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return toolList }
+        return toolList.filter { $0.localizedCaseInsensitiveContains(q.replacingOccurrences(of: " ", with: "_"))
+            || Inbox.toolInfo($0).action.localizedCaseInsensitiveContains(q) }
+    }
+
+    private func chosen(_ group: Inbox.ToolGroup) -> (read: Int, send: Bool) {
+        let names = Set(group.tools.map(\.name))
+        return (model.inboxReadTools.filter(names.contains).count, model.inboxSendTool.map(names.contains) ?? false)
+    }
+
+    private func isOpen(_ group: Inbox.ToolGroup) -> Binding<Bool> {
+        let c = chosen(group)
+        let byDefault = c.read > 0 || c.send || !query.isEmpty
+        return Binding(get: { opened[group.server] ?? byDefault }, set: { opened[group.server] = $0 })
+    }
+
+    private func groupHeader(_ group: Inbox.ToolGroup) -> some View {
+        let c = chosen(group)
+        let readable = group.tools.filter { $0.kind == .read }.map(\.name)
+        return HStack(spacing: 8) {
+            Button { isOpen(group).wrappedValue.toggle() } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isOpen(group).wrappedValue ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(width: 10)
+                    Text(group.server).font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary)
+                    Text(L.inboxGroupSummary(total: group.tools.count, read: c.read, send: c.send))
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            if !readable.isEmpty {
+                Button(L.inboxSelectReadTools) { selectRead(readable) }
+                    .help(L.inboxSelectReadToolsHelp)
+                    .disabled(readable.allSatisfy { model.inboxReadTools.contains($0) || model.inboxSendTool == $0 })
+            }
+            if c.read > 0 || c.send {
+                Button(L.inboxClearTools) { clear(group) }
+            }
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .textCase(nil)
+    }
+
+    @ViewBuilder private func groupRows(_ group: Inbox.ToolGroup) -> some View {
+        if isOpen(group).wrappedValue {
+            ForEach(group.tools.filter { $0.kind != .change }, id: \.name) { toolRow($0) }
+            let changing = group.tools.filter { $0.kind == .change }
+            if !changing.isEmpty {
+                DisclosureGroup {
+                    ForEach(changing, id: \.name) { toolRow($0) }
+                } label: {
+                    Text(L.inboxChangeTools(changing.count)).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .help(L.inboxChangeToolsHelp)
+                }
+            }
+        }
+    }
+
+    private func toolRow(_ info: Inbox.ToolInfo) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: info.kind == .read ? "eye" : info.kind == .send ? "paperplane" : "pencil")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            Text(info.action).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                .help(info.name)
+            Spacer(minLength: 8)
+            Picker(selection: role(info.name)) {
+                Text(L.inboxToolUnused).tag(Inbox.ToolRole.unused)
+                Text(L.inboxRead).tag(Inbox.ToolRole.read)
+                Text(L.inboxSendRole).tag(Inbox.ToolRole.send)
+            } label: { EmptyView() }
+            .labelsHidden()
+            .fixedSize()
+            .controlSize(.small)
+        }
+    }
+
+    private func selectRead(_ names: [String]) {
+        model.updateSettings { s in
+            var read = s.inboxReadTools ?? []
+            for n in names where !read.contains(n) && s.inboxSendTool != n { read.append(n) }
+            s.inboxReadTools = read.isEmpty ? nil : read
+        }
+    }
+
+    private func clear(_ group: Inbox.ToolGroup) {
+        let names = Set(group.tools.map(\.name))
+        model.updateSettings { s in
+            let read = (s.inboxReadTools ?? []).filter { !names.contains($0) }
+            s.inboxReadTools = read.isEmpty ? nil : read
+            if let send = s.inboxSendTool, names.contains(send) { s.inboxSendTool = nil }
+        }
     }
 
     /// Loaded tools plus any already chosen (so a choice stays visible before Load Tools).
