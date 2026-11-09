@@ -46,6 +46,14 @@ struct AccountCLITests {
         #expect(!codex.contains("CODEX_HOME='"))
     }
 
+    @Test func commandLineSetsVariablesAfterTheProfile() {
+        let line = AccountCLI.commandLine(provider: .claude, configDir: "/d", arguments: ["-p"],
+                                          variables: ["MCP_CONNECTION_NONBLOCKING": "false", "bad name": "x", "B": "it's"])
+        #expect(line.hasSuffix("CLAUDE_CONFIG_DIR='/d' B='it'\\''s' MCP_CONNECTION_NONBLOCKING='false' claude '-p'"))
+        #expect(!line.contains("bad name"))
+        #expect(Inbox.variables["MCP_CONNECTION_NONBLOCKING"] == "false")
+    }
+
     @Test func stripListComesFromEnvBuilder() {
         for name in EnvBuilder.claudeStripVariables + EnvBuilder.codexStripVariables {
             #expect(AccountCLI.strippedVariables.contains(name), "\(name)")

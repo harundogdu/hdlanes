@@ -35,6 +35,10 @@ public enum Inbox {
 
     // MARK: Tools
 
+    /// Environment of every inbox run. Claude Code connects claude.ai connectors (Microsoft 365, Gmail, …)
+    /// in the background by default, so the `init` line, and the first turn, would come before their tools.
+    public static let variables = ["MCP_CONNECTION_NONBLOCKING": "false"]
+
     /// Lists the account's tools without using any: the first `stream-json` line is the `init` event.
     /// The run itself is one tiny haiku turn with every tool denied.
     public static let toolListArguments = [
