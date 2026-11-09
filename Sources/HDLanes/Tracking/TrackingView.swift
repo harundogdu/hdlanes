@@ -39,6 +39,7 @@ struct TrackingView: View {
                 Picker(L.tracking, selection: $tracking.tab) {
                     Text(L.tabToday).tag(TrackingTab.today)
                     Text(L.tabPullRequests).tag(TrackingTab.pullRequests)
+                    Text(L.tabWorkItems).tag(TrackingTab.workItems)
                     Text(L.tabDaySummary).tag(TrackingTab.daySummary)
                 }
                 .pickerStyle(.segmented)
@@ -53,6 +54,7 @@ struct TrackingView: View {
             switch tracking.tab {
             case .today: TodayTab(review: { reviewTarget = $0 })
             case .pullRequests: PullRequestsTab(review: { reviewTarget = $0 })
+            case .workItems: WorkItemsTab()
             case .daySummary: DaySummaryTab()
             }
         }

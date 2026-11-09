@@ -349,6 +349,23 @@ a "N … · Show" line. Today tab: *waiting* leaves out stale PRs; *my open PRs*
 in the last 7 days and aren't already under waiting; the flow leaves out `turnDone` (listed under
 *finished today*).
 
+**Work items** (`HDCore/WorkItem.swift`, `Tracking/AppModel+WorkItems.swift`, `Tracking/WorkItemsTab.swift`).
+Azure Boards items for every Azure DevOps (org, project) the projects' `origin` remotes point at, read
+only while the **Work Items** tab is open (on opening, every 5 minutes, and when the people list changes).
+Per project, `az boards query --org … --project … --detect false -o json --wiql …` (60 s timeout), three
+WIQL queries, each with `[System.TeamProject] = '<project>'` (raw WIQL isn't scoped by `--project`, and
+`@project` matched nothing through `az`; verified live): mine open (`[System.AssignedTo] = @Me`, state not Closed/Done/Removed); teammates' open items
+changed in the last 30 days; state changed since yesterday (`Microsoft.VSTS.Common.StateChangeDate >=
+@Today - 1`) for me and teammates. Teammates are `AppSettings.trackedPeople` (email / unique name or display
+name, both match `[System.AssignedTo]`; verified live), edited in the tab's People… sheet, with suggestions
+from Azure PR authors and seen assignees. Names become WIQL literals via `WorkItemQuery.literal` (`'` doubled;
+control characters and brackets rejected). Mine is grouped by state (in-flight states first, not-started
+last), five rows per group, and items unchanged for 30 days sit behind a Show line. "Changed by" is the
+last changer, not necessarily who moved the state; old → new state needs the updates API (not read).
+Rows open `https://dev.azure.com/{org}/{project}/_workitems/edit/{id}`. A list (mine / teammates /
+changed) with any failed read keeps what it showed; a newer refresh (people changed) supersedes a running
+one by generation, and a cancelled one writes nothing.
+
 **Read-only rule.** Tracking never comments, votes, approves, completes, pushes or edits a PR. The only
 writes are local: the review worktree and session, the activity log and saved reports
 (`~/.hdlanes/reports/YYYY-MM-DD.md`).
@@ -455,7 +472,7 @@ Off unless `settings.aiCategorization`. `settings.aiProvider` picks the model (n
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner,FilePreview}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
 | workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner,Jev}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | inbox | `Inbox/*`, `HDCore/Inbox.swift` + tests | `Inbox/AppModel+Inbox.swift` (`refreshInbox`, `sendInboxReply`, `loadInboxTools`) |
-| tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
+| tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking,WorkItem}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
 
 Cross-area calls go only through the signatures in those three `AppModel+*.swift` files. Do not edit
 another area's files; if you need something from another area, call its contract method.

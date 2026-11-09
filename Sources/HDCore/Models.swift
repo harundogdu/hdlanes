@@ -228,6 +228,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var inboxFocus: String?
     /// Inbox: how far back a refresh looks, in hours.
     public var inboxHours: Int?
+    /// Tracking › Work items: teammates whose Azure Boards items are listed (unique names or display names).
+    public var trackedPeople: [String]?
 
     public init() {}
 }

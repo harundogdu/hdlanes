@@ -146,6 +146,50 @@ extension L {
     }
     static var loadingPullRequests: String { pick("Reading pull requests…", "PR'lar okunuyor…") }
 
+    // Work items
+    static var tabWorkItems: String { pick("Work Items", "İşler") }
+    static var sectionStateChanged: String { pick("State changed since yesterday", "Dünden beri durumu değişen") }
+    static var sectionMyWorkItems: String { pick("Assigned to me", "Bana atanan") }
+    static var sectionTeamWorkItems: String { pick("My teammates", "Ekibim") }
+    static var loadingWorkItems: String { pick("Reading work items…", "İşler okunuyor…") }
+    static var emptyStateChanged: String { pick("No state changes since yesterday.", "Dünden beri durum değişikliği yok.") }
+    static var emptyMyWorkItems: String { pick("Nothing open is assigned to you.", "Sana atanmış açık iş yok.") }
+    static var emptyTeamWorkItems: String {
+        pick("No open items of theirs changed in the last \(WorkItemQuery.peopleWindowDays) days.",
+             "Son \(WorkItemQuery.peopleWindowDays) günde değişen açık işleri yok.")
+    }
+    static var emptyNoPeople: String {
+        pick("Add teammates with People… to see their items here.", "İşlerini burada görmek için Kişiler… ile ekip arkadaşlarını ekle.")
+    }
+    static var workItemsNoProjects: String {
+        pick("None of your projects is on Azure DevOps, so there is no board to read. Work items come from the Azure DevOps projects of your projects' git remotes.",
+             "Projelerinin hiçbiri Azure DevOps'ta değil, okunacak pano yok. İşler, projelerinin git remote'larındaki Azure DevOps projelerinden okunur.")
+    }
+    static func workItemsPeopleButton(_ n: Int) -> String { n == 0 ? pick("People…", "Kişiler…") : pick("People (\(n))…", "Kişiler (\(n))…") }
+    static var workItemsPeopleHelp: String { pick("Choose whose items are listed under My teammates.", "Ekibim altında kimlerin işlerinin görüneceğini seç.") }
+    static var workItemsPeopleTitle: String { pick("Teammates", "Ekip arkadaşları") }
+    static var workItemsPeopleNote: String {
+        pick("Their open items (changed in the last \(WorkItemQuery.peopleWindowDays) days) and today's state changes are read from Azure Boards. Use the e-mail or the name exactly as Azure DevOps shows it.",
+             "Açık işleri (son \(WorkItemQuery.peopleWindowDays) günde değişenler) ve günün durum değişiklikleri Azure Boards'tan okunur. E-postayı ya da adı Azure DevOps'ta göründüğü gibi yaz.")
+    }
+    static var workItemsPersonPrompt: String { pick("e-mail or name", "e-posta ya da ad") }
+    static var workItemsSuggestions: String { pick("Seen in your PRs and boards", "PR'larında ve panolarda görülenler") }
+    static var openWorkItemHelp: String { pick("Open the work item in the browser", "İşi tarayıcıda aç") }
+    static var workItemUnassigned: String { pick("unassigned", "atanmamış") }
+    static func workItemChangedBy(_ name: String) -> String { pick("last changed by \(name)", "son değiştiren \(name)") }
+    static func workItemsIssue(_ issue: PRIssue) -> String {
+        switch issue {
+        case .cliMissing: return pick("az isn't installed; work items can't be read.", "az kurulu değil; işler okunamıyor.")
+        case .network: return pick("az couldn't reach Azure DevOps. Work items will be read again later.",
+                                   "az Azure DevOps'a ulaşamadı. İşler sonra yeniden okunacak.")
+        default: return prIssue(issue)
+        }
+    }
+    static func oldWorkItems(_ n: Int) -> String {
+        pick("\(n) unchanged for \(WorkItemQuery.peopleWindowDays) days", "\(WorkItemQuery.peopleWindowDays) gündür değişmeyen \(n) iş")
+    }
+    static func showMore(_ n: Int) -> String { pick("\(n) more", "\(n) tane daha") }
+    static var showFewer: String { pick("Show fewer", "Daha az göster") }
     static func hiddenOldPullRequests(_ n: Int) -> String {
         pick("\(n) with no activity for \(PullRequest.staleDays) days", "\(PullRequest.staleDays) gündür hareketsiz \(n) PR")
     }
