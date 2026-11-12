@@ -31,6 +31,9 @@ public enum SharedContext {
         case missingSource
         /// The account has its own file or folder there; left as is.
         case occupied
+        /// The account has its own folder there: the default account's items are linked one by one
+        /// inside it, next to the account's own (Claude Code creates `skills/synced` by itself).
+        case merged
         /// Not linked yet (`status` only; `sync` would link it).
         case notLinked
         case failed(String)
@@ -57,7 +60,11 @@ public enum SharedContext {
                 try? fm.removeItem(atPath: link)
                 return LinkResult(name: name, state: .missingSource)
             }
-            if itemExists(link, fm) { return LinkResult(name: name, state: .occupied) }
+            if itemExists(link, fm) {
+                guard isDirectory(link, fm), isFolder(target, fm) else { return LinkResult(name: name, state: .occupied) }
+                mergeItems(folder: link, sourceFolder: target, fm)
+                return LinkResult(name: name, state: .merged)
+            }
             guard sourceExists else { return LinkResult(name: name, state: .missingSource) }
             do {
                 try fm.createSymbolicLink(atPath: link, withDestinationPath: target)
@@ -79,7 +86,11 @@ public enum SharedContext {
                 if existing != target { return LinkResult(name: name, state: .occupied) }
                 return LinkResult(name: name, state: sourceExists ? .linked : .missingSource)
             }
-            if itemExists(link, fm) { return LinkResult(name: name, state: .occupied) }
+            if itemExists(link, fm) {
+                guard isDirectory(link, fm), isFolder(target, fm) else { return LinkResult(name: name, state: .occupied) }
+                let missing = sharedItems(target, fm).contains { !itemExists((link as NSString).appendingPathComponent($0), fm) }
+                return LinkResult(name: name, state: missing ? .notLinked : .merged)
+            }
             return LinkResult(name: name, state: sourceExists ? .notLinked : .missingSource)
         }
     }
@@ -91,9 +102,55 @@ public enum SharedContext {
         entries(for: provider).filter { name in
             let link = (accountDir as NSString).appendingPathComponent(name)
             let target = (sourceDir as NSString).appendingPathComponent(name)
-            guard (try? fm.destinationOfSymbolicLink(atPath: link)) == target else { return false }
-            return (try? fm.removeItem(atPath: link)) != nil
+            if (try? fm.destinationOfSymbolicLink(atPath: link)) == target {
+                return (try? fm.removeItem(atPath: link)) != nil
+            }
+            guard isDirectory(link, fm) else { return false }
+            return !ourItemLinks(folder: link, sourceFolder: target, fm).filter { (try? fm.removeItem(atPath: $0)) != nil }.isEmpty
         }
+    }
+
+    /// Links each of `sourceFolder`'s items into `folder` where `folder` has nothing of that name, and
+    /// removes item links of ours whose target is gone. The folder's own items are never touched.
+    private static func mergeItems(folder: String, sourceFolder: String, _ fm: FileManager) {
+        for link in ourItemLinks(folder: folder, sourceFolder: sourceFolder, fm) where !fm.fileExists(atPath: link) {
+            try? fm.removeItem(atPath: link)
+        }
+        for item in sharedItems(sourceFolder, fm) {
+            let link = (folder as NSString).appendingPathComponent(item)
+            guard !itemExists(link, fm) else { continue }
+            try? fm.createSymbolicLink(atPath: link, withDestinationPath: (sourceFolder as NSString).appendingPathComponent(item))
+        }
+    }
+
+    /// Items never shared: Claude Code keeps each login's claude.ai skills in `skills/synced`, and a link
+    /// there would make another account write into the default account's.
+    static let accountOwnItems: Set<String> = ["synced"]
+
+    /// Visible items of a default account's folder, minus each account's own.
+    private static func sharedItems(_ folder: String, _ fm: FileManager) -> [String] {
+        ((try? fm.contentsOfDirectory(atPath: folder)) ?? []).filter { !$0.hasPrefix(".") && !accountOwnItems.contains($0) }
+    }
+
+    /// Paths in `folder` that are symlinks hdlanes made to `sourceFolder/<same name>`.
+    private static func ourItemLinks(folder: String, sourceFolder: String, _ fm: FileManager) -> [String] {
+        ((try? fm.contentsOfDirectory(atPath: folder)) ?? []).compactMap { item in
+            let path = (folder as NSString).appendingPathComponent(item)
+            let mine = (sourceFolder as NSString).appendingPathComponent(item)
+            return (try? fm.destinationOfSymbolicLink(atPath: path)) == mine ? path : nil
+        }
+    }
+
+    /// A folder, following symlinks (the default account's folders may be links themselves).
+    private static func isFolder(_ path: String, _ fm: FileManager) -> Bool {
+        var dir: ObjCBool = false
+        return fm.fileExists(atPath: path, isDirectory: &dir) && dir.boolValue
+    }
+
+    /// A real folder (not a symlink to one).
+    private static func isDirectory(_ path: String, _ fm: FileManager) -> Bool {
+        guard let type = (try? fm.attributesOfItem(atPath: path))?[.type] as? FileAttributeType else { return false }
+        return type == .typeDirectory
     }
 
     /// lstat-style existence: true for a dangling symlink too.
