@@ -9,40 +9,44 @@ struct TaskBoardView: View {
     @State private var editing: IdentifiedID?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(L.board)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 Text(L.taskCount(model.state.tasks.count))
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.quaternary))
                 Spacer()
                 Button { model.isNewTaskSheetPresented = true } label: {
                     Label(L.newTask, systemImage: "plus")
                 }
+                .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .help(L.newTaskHelp)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 38)
-            Divider()
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
             if model.state.tasks.isEmpty {
-                ContentUnavailableView {
-                    Label(L.noTasks, systemImage: "checklist")
-                } description: {
-                    Text(L.noTasksBody)
-                } actions: {
-                    Button(L.newTaskEllipsis) { model.isNewTaskSheetPresented = true }
-                }
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(TaskStatus.allCases, id: \.self) { status in
-                        BoardColumn(status: status) { editing = IdentifiedID(id: $0) }
-                    }
-                }
-                .padding(10)
+                Text(L.noTasksBody)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
             }
+            // Columns always show, so the board reads as a board before the first task.
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(TaskStatus.allCases, id: \.self) { status in
+                    BoardColumn(status: status) { editing = IdentifiedID(id: $0) }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sheet(item: $editing) { TaskEditorSheet(taskID: $0.id) }
     }
 }
@@ -55,39 +59,80 @@ private struct BoardColumn: View {
 
     var body: some View {
         let tasks = model.tasks(in: status)
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Circle().fill(Self.color(status)).frame(width: 8, height: 8)
                 Text(L.taskStatusName(status))
                     .font(.system(size: 12, weight: .semibold))
                 Text(verbatim: "\(tasks.count)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(.quaternary))
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 4)
+            .padding(.top, 2)
             ScrollView {
-                LazyVStack(spacing: 6) {
+                LazyVStack(spacing: 8) {
                     ForEach(tasks) { task in
                         TaskCard(task: task, edit: edit)
                     }
-                    if tasks.isEmpty {
+                    if status == .backlog {
+                        Button { model.isNewTaskSheetPresented = true } label: {
+                            Label(L.newTask, systemImage: "plus")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(DashedBox())
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(L.newTaskHelp)
+                    } else if tasks.isEmpty {
                         Text(L.dropTasksHere)
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, minHeight: 60)
+                            .frame(maxWidth: .infinity, minHeight: 72)
+                            .background(DashedBox())
                     }
                 }
                 .padding(2)
             }
         }
-        .padding(6)
+        .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(isTargeted ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.quaternary.opacity(0.35)),
-                    in: RoundedRectangle(cornerRadius: 6))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.primary.opacity(isTargeted ? 0.09 : 0.035)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(isTargeted ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.primary.opacity(0.06)), lineWidth: 1))
         .dropDestination(for: String.self) { items, _ in
             let ids = items.compactMap(UUID.init(uuidString:))
             for id in ids { model.setTaskStatus(id, status) }
             return !ids.isEmpty
         } isTargeted: { isTargeted = $0 }
+    }
+}
+
+extension BoardColumn {
+    /// The column's dot: the status colors the rest of the app uses for the same stage.
+    static func color(_ status: TaskStatus) -> Color {
+        switch status {
+        case .backlog: return .secondary
+        case .active: return .accentColor
+        case .review: return .orange
+        case .done: return .green
+        }
+    }
+}
+
+/// A dashed outline for drop areas and the add card.
+private struct DashedBox: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(Color.primary.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
     }
 }
 
@@ -98,6 +143,7 @@ private struct TaskCard: View {
     @State private var confirmDelete = false
     @State private var isCategorizing = false
     @State private var aiError: String?
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -124,10 +170,12 @@ private struct TaskCard: View {
             }
             LinkedSessions(sessions: model.sessions(forTask: task.id))
         }
-        .padding(8)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(hovering ? 0.08 : 0.055)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(hovering ? AnyShapeStyle(.tint.opacity(0.6)) : AnyShapeStyle(Color.primary.opacity(0.08)), lineWidth: 1))
+        .onHover { hovering = $0 }
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { edit(task.id) }
         .draggable(task.id.uuidString) {
