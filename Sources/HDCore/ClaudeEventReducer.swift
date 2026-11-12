@@ -188,6 +188,7 @@ public struct ClaudeEventReducer: Sendable {
         let tool = p["tool_name"]?.string ?? "?"
         let input = p["tool_input"]
         let detail = ClaudeToolSummary.detail(tool: tool, input: input)
+        let summary = ClaudeToolSummary.summary(tool: tool, input: input)
         let agentID = p["agent_id"]?.string.flatMap { $0.isEmpty ? nil : $0 }
         let late = isLate(stamp)
         let id = p["tool_use_id"]?.string.flatMap { $0.isEmpty ? nil : $0 } ?? nextID("tool")
@@ -195,9 +196,10 @@ public struct ClaudeEventReducer: Sendable {
         if let i = s.activity.firstIndex(where: { $0.id == id }) {
             // PostToolUse got here first: keep it finished, fill in what it lacked.
             if s.activity[i].detail.isEmpty { s.activity[i].detail = detail }
+            if s.activity[i].summary == nil { s.activity[i].summary = summary }
         } else {
             appendActivity(ActivityItem(id: id, at: now, agentID: agentID, tool: tool, detail: detail,
-                                        isRunning: !late), &s)
+                                        summary: summary, isRunning: !late), &s)
         }
 
         if let agentID {
@@ -236,7 +238,8 @@ public struct ClaudeEventReducer: Sendable {
             s.activity[i].failed = failed
         } else {
             appendActivity(ActivityItem(id: toolUseID ?? nextID("tool"), at: now, agentID: agentID, tool: tool,
-                                        detail: detail, isRunning: false, failed: failed), &s)
+                                        detail: detail, summary: ClaudeToolSummary.summary(tool: tool, input: p["tool_input"]),
+                                        isRunning: false, failed: failed), &s)
         }
 
         // The tool the user was asked about has run (or failed): the prompt is gone.
@@ -473,6 +476,13 @@ public enum ClaudeToolSummary {
         }
         if let field, !field.isEmpty { return truncate(field) }
         return truncate(compactJSON(input))
+    }
+
+    /// The agent's own one-line purpose for a call, when the tool has one (Bash `description`).
+    public static func summary(tool: String, input: JSONValue?) -> String? {
+        guard tool == "Bash", let text = input?["description"]?.string else { return nil }
+        let line = firstLine(text)
+        return line.isEmpty ? nil : truncate(line)
     }
 
     /// First question text of an AskUserQuestion input.
