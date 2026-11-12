@@ -216,6 +216,8 @@ final class HDTerminalView: LocalProcessTerminalView {
         // for keys without a character (arrows, ⌥⌫, ⌥⏎).
         optionAsMetaKey = false
         optionAsMetaKeyForFunctionalKeys = true
+        // A little air between lines; SwiftTerm draws box characters itself, so frames stay joined.
+        lineSpacing = 1.1
         TerminalTheme.apply(palette, to: self)
         installOutputObserver()
     }
