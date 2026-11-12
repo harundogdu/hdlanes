@@ -74,7 +74,7 @@ final class AppModel {
     @ObservationIgnored let terminals = TerminalRegistry()
     /// Colors of every terminal (`UI/AppModel+Appearance.swift`).
     var terminalPalette: TerminalPalette = .standard
-    /// Window colors (`UI/AppModel+Appearance.swift`); nil = Klasik, the system look.
+    /// Window colors (`UI/AppModel+Appearance.swift`); nil = Classic, the system look.
     var appTheme: AppTheme?
 
     // Runtime area (Runtime/)

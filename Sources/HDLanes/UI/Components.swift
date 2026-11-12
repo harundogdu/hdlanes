@@ -182,7 +182,7 @@ struct CompactEmptyState: View {
     }
 }
 
-/// A sidebar destination's icon: a colored tile under a theme, the plain symbol in Klasik.
+/// A sidebar destination's icon: a colored tile under a theme, the plain symbol in Classic.
 struct NavIcon: View {
     let symbol: String
     /// Index into `AppTheme.navTints`.
@@ -202,7 +202,7 @@ struct NavIcon: View {
     }
 }
 
-/// Status as a colored pill (themes) or glyph + text (Klasik).
+/// Status as a colored pill (themes) or glyph + text (Classic).
 struct StatusPill: View {
     let status: AgentStatus
     @Environment(AppModel.self) private var model

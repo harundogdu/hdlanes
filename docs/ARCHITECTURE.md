@@ -541,9 +541,11 @@ absolute and `~/` paths open, and a `:line` suffix is dropped.
   column (painted edge to edge over the split view's material), title bar, session header, inspector and
   usage footer, sets text color and `.tint`, hides list/scroll backgrounds in the detail area
   (`scrollContentBackground(.hidden)`), forces dark Aqua for AppKit controls and alerts, and gives the
-  sidebar's Tracking / Inbox / Board icons colored tiles and the header status a pill. Picking a theme
-  also picks the terminal palette it was drawn with (Tokyo Night, Graphite, Warm Charcoal); a terminal
-  theme chosen afterwards stays. Segmented pickers and split-view dividers stay system-drawn.
+  sidebar's Tracking / Inbox / Board icons colored tiles and the header status a pill. Graphite also puts
+  a soft shadow under the terminal card (on a shape behind it, not on the terminal view). Switching
+  themes moves the terminal to the new theme's palette (Tokyo Night, Graphite, Warm Charcoal; Classic →
+  hdlanes) only while it shows the default or the outgoing theme's palette: a terminal theme the user
+  picked stays. Segmented pickers and split-view dividers stay system-drawn.
 - Every list has an empty state with one sentence + one action; side panels use `CompactEmptyState`
   (13 pt title), not `ContentUnavailableView`'s large title. Every async action has a progress state
   and an error state (`model.show(error:title:)` or inline). No dead buttons: disable with a tooltip

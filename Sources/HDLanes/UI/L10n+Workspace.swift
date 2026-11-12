@@ -595,8 +595,8 @@ extension L {
         }
     }
     static var appThemeNote: String {
-        pick("Colors the sidebar, header, panels and terminal together. Picking a theme also picks its terminal colors; you can change those below afterwards.",
-             "Kenar çubuğunu, başlığı, panelleri ve terminali birlikte renklendirir. Tema seçmek terminal renklerini de seçer; sonra aşağıdan değiştirebilirsin.")
+        pick("Colors the sidebar, header, panels and terminal together. Picking a theme also picks its terminal colors, unless you chose your own below.",
+             "Kenar çubuğunu, başlığı, panelleri ve terminali birlikte renklendirir. Aşağıdan kendi terminal renklerini seçmediysen tema onları da seçer.")
     }
     static var terminalTheme: String { pick("Theme", "Tema") }
     static var importThemeEllipsis: String { pick("Import Theme…", "Tema İçe Aktar…") }

@@ -57,7 +57,7 @@ enum Theme {
 }
 
 extension View {
-    /// Fills the background with the app theme's `color`, or leaves the system look (Klasik).
+    /// Fills the background with the app theme's `color`, or leaves the system look (Classic).
     @ViewBuilder
     func themeBackground(_ theme: AppTheme?, _ color: KeyPath<AppTheme, RGB>) -> some View {
         if let theme { background(Theme.color(theme[keyPath: color])) } else { self }
@@ -67,9 +67,9 @@ extension View {
     @ViewBuilder
     func themeColors(_ theme: AppTheme?) -> some View {
         if let theme {
+            // Dark controls come from `NSApp.appearance` (`applyAppAppearance`).
             foregroundStyle(Theme.color(theme.text))
                 .tint(Theme.color(theme.accent))
-                .preferredColorScheme(.dark)
         } else {
             self
         }

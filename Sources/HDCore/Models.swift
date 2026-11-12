@@ -216,7 +216,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var terminalFontSize: Double?
     /// `TerminalPalette.id`; nil → hdlanes' own palette.
     public var terminalTheme: String?
-    /// `AppTheme.id` of the window's colors; nil → Klasik (the system look).
+    /// `AppTheme.id` of the window's colors; nil → Classic (the system look).
     public var appTheme: String?
     /// Font family of a fixed-pitch font; nil → the system monospaced font.
     public var terminalFont: String?

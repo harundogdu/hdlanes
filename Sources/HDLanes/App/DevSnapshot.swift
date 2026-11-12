@@ -96,7 +96,9 @@ enum DevSnapshot {
                 steps.append(("theme-\(theme.id)-tracking", { model.selection = .tracking }))
             }
         }
+        // Back to Classic, so the steps after these and the test home's settings stay as they were.
         steps.append(("settings-appearance", {
+            model.setAppTheme(nil)
             defaults.set("terminal", forKey: "hd.settingsTab")
             settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(model))
             settingsWindow.center()

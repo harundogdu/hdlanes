@@ -3,17 +3,21 @@ import HDCore
 
 // OWNER: workspace area. Window theme, terminal colors and font (Settings › Appearance).
 extension AppModel {
-    /// Switches the window colors and, with them, the terminal palette the theme was drawn with;
-    /// a terminal theme picked afterwards stays. nil = Klasik.
+    /// Switches the window colors. The terminal follows the theme's own palette only while it still
+    /// shows the default or the outgoing theme's palette, so a terminal theme the user picked stays.
+    /// nil = Classic.
     func setAppTheme(_ id: String?) {
         let theme = AppTheme.resolve(id)
+        guard theme?.id != appTheme?.id else { return }
+        let current = state.settings.terminalTheme ?? TerminalPalette.defaultID
+        let followsTheme = current == TerminalPalette.defaultID || current == appTheme?.terminalPalette
         state.settings.appTheme = theme?.id
         appTheme = theme
-        setTerminalTheme(theme?.terminalPalette ?? TerminalPalette.defaultID)
+        if followsTheme { setTerminalTheme(theme?.terminalPalette ?? TerminalPalette.defaultID) }
         applyAppAppearance()
     }
 
-    /// The themes are dark: system controls, sheets and alerts (AppKit too) follow. Klasik follows the system.
+    /// The themes are dark: system controls, sheets and alerts (AppKit too) follow. Classic follows the system.
     func applyAppAppearance() {
         NSApp.appearance = appTheme == nil ? nil : NSAppearance(named: .darkAqua)
     }

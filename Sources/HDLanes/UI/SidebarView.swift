@@ -290,7 +290,7 @@ private struct SidebarEmptyState: View {
     }
 }
 
-/// A list drawn on the theme's color instead of the system material (Klasik keeps the material).
+/// A list drawn on the theme's color instead of the system material (Classic keeps the material).
 struct ThemedList: ViewModifier {
     let theme: AppTheme?
     let color: KeyPath<AppTheme, RGB>

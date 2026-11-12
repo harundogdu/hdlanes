@@ -171,7 +171,12 @@ private struct SessionTerminalArea: View {
             shape.strokeBorder(edge(account: account, palette: palette), lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(model.appTheme?.cardShadow == true ? 0.45 : 0), radius: 14, y: 6)
+        // A shadow on a shape behind the card, never on the hosted terminal view itself.
+        .background {
+            if model.appTheme?.cardShadow == true {
+                shape.fill(Color.black).shadow(color: .black.opacity(0.4), radius: 12, y: 5)
+            }
+        }
         .padding(model.appTheme == nil ? 8 : 10)
         .background(model.appTheme.map { Theme.color($0.window) } ?? Color(nsColor: .windowBackgroundColor))
     }
