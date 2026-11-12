@@ -128,6 +128,8 @@ private struct InspectorTabButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(title)
+        .accessibilityLabel(title)
+        .accessibilityValue(count > 0 ? Text(verbatim: "\(count)") : Text(verbatim: ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

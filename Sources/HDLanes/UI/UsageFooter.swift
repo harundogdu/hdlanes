@@ -58,7 +58,7 @@ struct UsageFooter: View {
             let title = AccountGrouping.split(account.label).group ?? ""
             if let i = out.firstIndex(where: { $0.title == title }) { out[i].accounts.append(account) } else { out.append((title, [account])) }
         }
-        return out.sorted { ($0.title.isEmpty ? 1 : 0) < ($1.title.isEmpty ? 1 : 0) }
+        return out.filter { !$0.title.isEmpty } + out.filter { $0.title.isEmpty }
     }
 }
 
@@ -84,6 +84,7 @@ private struct UsageRow: View {
                 .background(Theme.accountColor(account.colorIndex).opacity(0.16), in: Capsule())
                 if let plan = usage?.plan ?? account.plan {
                     Text(plan.capitalized)
+                        .lineLimit(1)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 5)

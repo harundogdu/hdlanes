@@ -22,12 +22,14 @@ struct DaySummaryTab: View {
             HStack(spacing: 8) {
                 Button { shift(-1) } label: { Image(systemName: "chevron.left") }
                     .help(L.sumPreviousDay)
+                    .accessibilityLabel(L.sumPreviousDay)
                 DatePicker(L.day, selection: $day, in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .labelsHidden()
                     .fixedSize()
                 Button { shift(1) } label: { Image(systemName: "chevron.right") }
                     .help(L.sumNextDay)
+                    .accessibilityLabel(L.sumNextDay)
                     .disabled(isToday)
                 Button(L.sumToday) { day = Date() }
                     .disabled(isToday)
@@ -86,8 +88,11 @@ struct DaySummaryTab: View {
     }
 
     private func shift(_ days: Int) {
-        guard let next = Calendar.current.date(byAdding: .day, value: days, to: day), next <= Date() else { return }
-        day = next
+        let cal = Calendar.current
+        guard let next = cal.date(byAdding: .day, value: days, to: day),
+              cal.startOfDay(for: next) <= cal.startOfDay(for: Date()) else { return }
+        // Today's date with the current time, so the picker's `...Date()` range keeps it.
+        day = cal.isDateInToday(next) ? Date() : next
     }
 
     private var selectedAccount: Account? {
@@ -189,7 +194,8 @@ private struct DayReportView: View {
                 .font(.system(size: 20, weight: .semibold))
             ReportSection(title: L.sumDone, symbol: "checkmark.circle", color: .green, count: report.done.count) {
                 ForEach(report.done) { d in
-                    Button { if let id = d.sessionID { model.selection = .session(id) } } label: {
+                    let open = d.sessionID.flatMap { id in model.session(id).flatMap { $0.isArchived == true ? nil : id } }
+                    Button { if let open { model.selection = .session(open) } } label: {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
                                 Text(d.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
@@ -206,8 +212,8 @@ private struct DayReportView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(d.sessionID == nil)
-                    .help(L.sumOpenSession)
+                    .disabled(open == nil)
+                    .help(open == nil ? "" : L.sumOpenSession)
                 }
             }
             ReportSection(title: L.sumPullRequests, symbol: "arrow.triangle.pull", color: .purple,
@@ -222,13 +228,12 @@ private struct DayReportView: View {
                 ForEach(Array(report.tomorrow.enumerated()), id: \.offset) { _, item in itemRow(item, .teal) }
             }
         }
-        .textSelection(.enabled)
     }
 
     /// Claude's reply without markdown marks (`**bold**`, `` `code` ``, `# heading`), for a one-line preview.
+    /// `__` stays: it is as often part of a name (`__init__`) as emphasis.
     static func plain(_ text: String) -> String {
-        var t = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
-            .replacingOccurrences(of: "`", with: "")
+        var t = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
         while t.hasPrefix("#") { t.removeFirst() }
         return t.trimmingCharacters(in: .whitespaces)
     }
