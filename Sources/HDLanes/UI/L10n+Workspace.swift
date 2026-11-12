@@ -460,6 +460,21 @@ extension L {
         return pick("Sign in on the page that opens in your browser. It uses whichever \(site) account is signed in there; for a different one, open the link in a private window or another browser profile. Press Done when the terminal says you're logged in.",
                     "Tarayıcıda açılan sayfada giriş yap. Orada açık olan \(site) hesabı kullanılır; başka bir hesap için bağlantıyı gizli pencerede ya da başka bir tarayıcı profilinde aç. Terminal girişin tamamlandığını söyleyince Bitti'ye bas.")
     }
+    static var deviceCodeTitle: String { pick("Device code (sign in on any device)", "Cihaz kodu (herhangi bir cihazdan giriş)") }
+    static var deviceCodeDetail: String {
+        pick("Runs codex login --device-auth (beta): the terminal shows a link and a one-time code; enter the code in a browser on any device, signed in to the ChatGPT account you want. Nothing opens on this Mac.",
+             "codex login --device-auth (beta) çalıştırır: terminal bir bağlantı ve tek kullanımlık kod gösterir; kodu herhangi bir cihazdaki tarayıcıda, istediğin ChatGPT hesabıyla giriş yapıp gir. Bu Mac'te hiçbir şey açılmaz.")
+    }
+    static var browserLoginHelp: String {
+        pick("Runs codex login: signs in on the page that opens in this Mac's default browser.",
+             "codex login çalıştırır: bu Mac'in varsayılan tarayıcısında açılan sayfada giriş yapılır.")
+    }
+    static var deviceCodeInstructions: String {
+        pick("Open the link shown below in any browser, sign in to the ChatGPT account for this account and enter the code. If device code sign-in is off, turn it on in ChatGPT's security settings (personal account) or ask a workspace admin to allow it in the workspace permissions. Press Done when the terminal says you're logged in.",
+             "Aşağıda görünen bağlantıyı herhangi bir tarayıcıda aç, bu hesabın ChatGPT hesabıyla giriş yap ve kodu gir. Cihaz koduyla giriş kapalıysa ChatGPT'nin güvenlik ayarlarından aç (kişisel hesap) ya da çalışma alanı yöneticisinden çalışma alanı izinlerinde açmasını iste. Terminal girişin tamamlandığını söyleyince Bitti'ye bas.")
+    }
+    static var useDeviceCode: String { pick("Use a Device Code", "Cihaz Kodu Kullan") }
+    static var useBrowserLogin: String { pick("Use the Browser", "Tarayıcıyı Kullan") }
     static var pasteTokenPlaceholder: String { pick("Paste the token shown above", "Yukarıda görünen token'ı yapıştır") }
     static var saved: String { pick("Saved", "Kaydedildi") }
     static var runAgain: String { pick("Run Again", "Yeniden Çalıştır") }

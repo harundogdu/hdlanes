@@ -37,6 +37,12 @@ enum DevSnapshot {
                                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
         settingsWindow.identifier = NSUserInterfaceItemIdentifier("dev-settings")
         settingsWindow.isReleasedWhenClosed = false
+        steps.append(("settings-add-codex", {
+            settingsWindow.setContentSize(NSSize(width: 520, height: 520))
+            settingsWindow.contentView = NSHostingView(rootView: AddAccountSheet(provider: .codex).environment(model))
+            settingsWindow.center()
+            settingsWindow.orderFront(nil)
+        }))
         // Inbox setup with a made-up tool list (the test home has no connectors).
         steps.append(("settings-inbox-setup", {
             let m365 = ["chat_message_search", "get_me", "outlook_email_search", "read_resource", "outlook_send_mail",

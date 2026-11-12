@@ -9,11 +9,14 @@ enum LoginFlow: Identifiable, Equatable {
     case terminal(AuthMethod)
     /// A pasted key or token saved by hdlanes: Claude API key, Codex API key / access token.
     case secret(AuthMethod)
+    /// Codex: `codex login --device-auth`, a code entered on any device's browser.
+    case deviceCode
 
     var id: String {
         switch self {
         case .terminal(let m): return "t-" + m.rawValue
         case .secret(let m): return "s-" + m.rawValue
+        case .deviceCode: return "device"
         }
     }
 
@@ -271,13 +274,23 @@ struct AddAccountSheet: View {
         case login(UUID, LoginFlow)
     }
 
+    /// A sign-in choice: an `AuthMethod`, or Codex's device code (stored as a browser login).
+    private enum Choice: Hashable {
+        case method(AuthMethod)
+        case deviceCode
+    }
+
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var provider: Provider = .claude
+    @State private var provider: Provider
     @State private var label = ""
-    @State private var method: AuthMethod = .browser
+    @State private var choice: Choice = .method(.browser)
     @State private var step: Step = .form
     @State private var error: String?
+
+    init(provider: Provider = .claude) {
+        _provider = State(initialValue: provider)
+    }
 
     var body: some View {
         switch step {
@@ -306,9 +319,8 @@ struct AddAccountSheet: View {
                       prompt: Text(L.defaultAccountLabel(provider, model.accounts(for: provider).count + 1)))
                 .textFieldStyle(.roundedBorder)
             VStack(alignment: .leading, spacing: 10) {
-                ForEach([AuthMethod.browser, .token, .apiKey], id: \.self) { m in
-                    MethodOption(title: L.methodTitle(m, provider), detail: L.methodDetail(m, provider),
-                                 selected: method == m) { method = m }
+                ForEach(choices, id: \.self) { c in
+                    MethodOption(title: title(c), detail: detail(c), selected: choice == c) { choice = c }
                 }
             }
             Text(L.addAccountFootnote)
@@ -327,12 +339,34 @@ struct AddAccountSheet: View {
         }
         .padding(18)
         .frame(width: 520)
+        .onChange(of: provider) { if !choices.contains(choice) { choice = .method(.browser) } }
+    }
+
+    private var choices: [Choice] {
+        provider == .codex ? [.method(.browser), .deviceCode, .method(.token), .method(.apiKey)]
+                           : [.method(.browser), .method(.token), .method(.apiKey)]
+    }
+
+    private func title(_ c: Choice) -> String {
+        switch c {
+        case .method(let m): return L.methodTitle(m, provider)
+        case .deviceCode: return L.deviceCodeTitle
+        }
+    }
+
+    private func detail(_ c: Choice) -> String {
+        switch c {
+        case .method(let m): return L.methodDetail(m, provider)
+        case .deviceCode: return L.deviceCodeDetail
+        }
     }
 
     private func create() {
         do {
+            let method: AuthMethod
+            if case .method(let m) = choice { method = m } else { method = .browser }
             let account = try model.addAccount(provider: provider, label: label, method: method)
-            step = .login(account.id, LoginFlow.flow(provider: provider, method: method))
+            step = .login(account.id, choice == .deviceCode ? .deviceCode : LoginFlow.flow(provider: provider, method: method))
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -392,6 +426,8 @@ private struct LoginFlowView: View {
             switch flow {
             case .terminal(let method):
                 LoginTerminalSheet(account: account, method: method, finish: finish)
+            case .deviceCode:
+                LoginTerminalSheet(account: account, method: .browser, deviceCode: true, finish: finish)
             case .secret(let method):
                 SecretEntryPanel(account: account, method: method, finish: finish)
             }
@@ -412,18 +448,29 @@ struct LoginTerminalSheet: View {
     let method: AuthMethod
     let finish: () -> Void
     @Environment(AppModel.self) private var model
+    /// Codex browser login run as `codex login --device-auth` instead; switchable in the sheet.
+    @State private var deviceCode: Bool
     @State private var terminalID = UUID()
     @State private var token = ""
     @State private var saved = false
     @State private var error: String?
 
+    init(account: Account, method: AuthMethod, deviceCode: Bool = false, finish: @escaping () -> Void) {
+        self.account = account
+        self.method = method
+        self.finish = finish
+        _deviceCode = State(initialValue: deviceCode)
+    }
+
     private var isClaudeToken: Bool { account.provider == .claude && method == .token }
+    /// Codex's ChatGPT login can run either way.
+    private var canSwitchToDeviceCode: Bool { account.provider == .codex && method == .browser }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L.loginTitle(account))
                 .font(.headline)
-            Text(L.loginInstructions(account: account, method: method))
+            Text(deviceCode ? L.deviceCodeInstructions : L.loginInstructions(account: account, method: method))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -448,6 +495,13 @@ struct LoginTerminalSheet: View {
             HStack {
                 Button(L.runAgain, action: restart)
                     .help(L.runAgainHelp)
+                if canSwitchToDeviceCode {
+                    Button(deviceCode ? L.useBrowserLogin : L.useDeviceCode) {
+                        deviceCode.toggle()
+                        restart()
+                    }
+                    .help(deviceCode ? L.browserLoginHelp : L.deviceCodeDetail)
+                }
                 Spacer()
                 // No default-button shortcut: Return must reach the terminal.
                 Button(L.done, action: done)
@@ -460,7 +514,11 @@ struct LoginTerminalSheet: View {
     }
 
     private func start() {
-        model.terminals.start(terminalID, spec: model.loginSpec(account: account, method: method, cwd: model.accountCLIDirectory()))
+        let cwd = model.accountCLIDirectory()
+        let spec = deviceCode && canSwitchToDeviceCode
+            ? model.loginSpec(account: account, flow: .deviceCode, cwd: cwd)
+            : model.loginSpec(account: account, method: method, cwd: cwd)
+        model.terminals.start(terminalID, spec: spec)
     }
 
     private func cleanUp() {
