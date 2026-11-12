@@ -200,14 +200,10 @@ private struct WorkItemRow: View {
         ]
         TrackingRow(title: item.title, subtitle: parts.compactMap { $0 }.joined(separator: " · "),
                     help: L.openWorkItemHelp, action: { model.openInBrowser(item.webURL) }) {
-            Image(systemName: symbol).foregroundStyle(.secondary).font(.system(size: 11))
+            Image(systemName: symbol).foregroundStyle(typeColor).font(.system(size: 11))
         } trailing: {
             HStack(spacing: 8) {
-                Text(item.state)
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.quaternary, in: Capsule())
+                WorkItemStateChip(state: item.state)
                 if let date { RelativeTimeText(date: date) }
             }
         }
@@ -215,6 +211,16 @@ private struct WorkItemRow: View {
             Button(L.openPR) { model.openInBrowser(item.webURL) }
             Button(L.copyLink) { Panels.copy(item.webURL) }
         }
+    }
+
+    /// Bugs red, stories and backlog items blue, tasks yellow, features and epics purple.
+    private var typeColor: Color {
+        let t = item.type.lowercased()
+        if t.contains("bug") { return .red }
+        if t.contains("task") { return .yellow }
+        if t.contains("feature") || t.contains("epic") { return .purple }
+        if t.contains("backlog") || t.contains("story") || t.contains("requirement") { return .blue }
+        return .secondary
     }
 
     private var symbol: String {
@@ -289,5 +295,36 @@ private struct TrackedPeopleSheet: View {
         guard WorkItemQuery.literal(draft) != nil else { return }
         model.setTrackedPeople(model.trackedPeople + [draft])
         draft = ""
+    }
+}
+
+/// A work item's state as a colored chip: blocked red, in flight blue, new purple, waiting yellow,
+/// test orange, preview / review teal, deployment and resolved green; anything else gray.
+struct WorkItemStateChip: View {
+    let state: String
+
+    var body: some View {
+        let color = Self.color(state)
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text(state).lineLimit(1)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(color)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.16), in: Capsule())
+    }
+
+    static func color(_ state: String) -> Color {
+        let s = state.lowercased()
+        if s.contains("blocked") { return .red }
+        if s.contains("deploy") || s.contains("release") || s.contains("resolved") || s.contains("done") { return .green }
+        if s.contains("preview") || s.contains("review") { return .teal }
+        if s.contains("test") || s.contains("qa") || s.contains("verif") { return .orange }
+        if s.contains("waiting") || s.contains("on hold") || s.contains("pending") { return .yellow }
+        if s == "new" || s == "proposed" { return .purple }
+        if WorkItem.stateRank(state) == 0 { return .blue }
+        return .gray
     }
 }
