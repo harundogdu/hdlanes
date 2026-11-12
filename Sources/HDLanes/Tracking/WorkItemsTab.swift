@@ -213,9 +213,9 @@ private struct WorkItemRow: View {
         }
     }
 
-    /// Bugs red, stories and backlog items blue, tasks yellow, features and epics purple.
     @Environment(\.colorScheme) private var scheme
 
+    /// Bugs red, stories and backlog items blue, tasks yellow (orange on light), features and epics purple.
     private var typeColor: Color {
         let t = item.type.lowercased()
         if t.contains("bug") { return .red }

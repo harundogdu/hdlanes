@@ -284,8 +284,8 @@ extension L {
     static func usageTooltip(account: Account, usage: AccountUsage?, now: Date) -> String {
         var lines = [account.label]
         if let u = usage {
-            if let w = u.fiveHour { lines.append(windowLine(pick("5-hour", "5 saatlik"), w, now: now)) }
-            if let w = u.week { lines.append(windowLine(pick("Week", "Haftalık"), w, now: now)) }
+            if let w = u.fiveHour { lines.append(windowLine(pick("5-hour", "5 saatlik"), w, known: u.percent(\.fiveHour, at: now), now: now)) }
+            if let w = u.week { lines.append(windowLine(pick("Week", "Haftalık"), w, known: u.percent(\.week, at: now), now: now)) }
             if let plan = u.plan ?? account.plan { lines.append(pick("Plan: \(plan)", "Plan: \(plan)")) }
         }
         if let email = account.email { lines.append(email) }
@@ -296,8 +296,10 @@ extension L {
         }
         return lines.joined(separator: "\n")
     }
-    private static func windowLine(_ name: String, _ w: UsageWindow, now: Date) -> String {
-        let pct = percent(w.percent(at: now))
+    /// `known` is the window's use as the footer shows it (nil: not reported in the last reading).
+    private static func windowLine(_ name: String, _ w: UsageWindow, known: Double?, now: Date) -> String {
+        guard let value = known else { return pick("\(name): not reported lately", "\(name): son okumada yok") }
+        let pct = percent(value)
         guard let reset = w.resetsAt else { return "\(name): \(pct)" }
         if w.hasReset(at: now) { return pick("\(name): \(pct) · reset \(relative(reset, now: now))", "\(name): \(pct) · \(relative(reset, now: now)) sıfırlandı") }
         return pick("\(name): \(pct) · resets \(relative(reset, now: now))", "\(name): \(pct) · sıfırlanma \(relative(reset, now: now))")
@@ -423,8 +425,8 @@ extension L {
     static func usageSummary(_ u: AccountUsage) -> String {
         var parts: [String] = []
         let now = Date()
-        if let w = u.fiveHour { parts.append(pick("5h \(percent(w.percent(at: now)))", "5 saat \(percent(w.percent(at: now)))")) }
-        if let w = u.week { parts.append(pick("week \(percent(w.percent(at: now)))", "hafta \(percent(w.percent(at: now)))")) }
+        if let v = u.percent(\.fiveHour, at: now) { parts.append(pick("5h \(percent(v))", "5 saat \(percent(v))")) }
+        if let v = u.percent(\.week, at: now) { parts.append(pick("week \(percent(v))", "hafta \(percent(v))")) }
         parts.append(pick("updated \(relative(u.updatedAt))", "güncellendi \(relative(u.updatedAt))"))
         return parts.joined(separator: " · ")
     }

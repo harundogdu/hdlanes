@@ -61,7 +61,7 @@ private struct BoardColumn: View {
         let tasks = model.tasks(in: status)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
-                Circle().fill(Self.color(status)).frame(width: 8, height: 8)
+                Circle().fill(status == .active ? AnyShapeStyle(.tint) : AnyShapeStyle(Self.color(status))).frame(width: 8, height: 8)
                 Text(L.taskStatusName(status))
                     .font(.system(size: 12, weight: .semibold))
                 Text(verbatim: "\(tasks.count)")
