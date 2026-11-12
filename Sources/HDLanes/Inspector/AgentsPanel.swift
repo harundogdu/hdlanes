@@ -153,7 +153,7 @@ struct FinishedSubagentRow: View {
 struct ActivityRow: View {
     let item: ActivityItem
     let agentLabel: String
-    /// nil for the main agent: only subagents are named on the row.
+    /// Only subagents are named on the row.
     var isSubagent: Bool = false
 
     var body: some View {
@@ -177,7 +177,7 @@ struct ActivityRow: View {
                     // The command itself, under the agent's description of it.
                     if item.summary != nil, !item.detail.isEmpty {
                         Text(verbatim: item.detail)
-                            .font(.system(size: 10.5, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
@@ -197,7 +197,7 @@ struct ActivityRow: View {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.red).help(L.failed)
                 } else {
                     RelativeTimeText(date: item.at)
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .help(Text(item.at, format: .dateTime.hour().minute().second()))
                 }
@@ -233,7 +233,7 @@ struct ToolStyle {
         case "AskUserQuestion":
             symbol = "questionmark.bubble"
         case "Skill":
-            symbol = "sparkles"
+            symbol = "book"
         default:
             symbol = tool.hasPrefix("mcp__") ? "puzzlepiece.extension" : "wrench.and.screwdriver"
         }
@@ -248,7 +248,9 @@ struct ToolStyle {
         let values = object.keys.sorted().compactMap { key -> String? in
             switch object[key] {
             case let s as String: return s.isEmpty ? nil : s
-            case let n as NSNumber: return n.stringValue
+            case let n as NSNumber:
+                // JSON true/false arrive as NSNumber too.
+                return CFGetTypeID(n) == CFBooleanGetTypeID() ? (n.boolValue ? "true" : "false") : n.stringValue
             default: return nil
             }
         }

@@ -1,6 +1,6 @@
 import AppKit
-import HDCore
 import Foundation
+import HDCore
 import SwiftUI
 
 /// Developer aid: with `HDLANES_SNAPSHOT_DIR` set, the app draws its own windows into PNGs (no screen
