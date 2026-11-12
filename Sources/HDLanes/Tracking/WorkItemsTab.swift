@@ -214,10 +214,12 @@ private struct WorkItemRow: View {
     }
 
     /// Bugs red, stories and backlog items blue, tasks yellow, features and epics purple.
+    @Environment(\.colorScheme) private var scheme
+
     private var typeColor: Color {
         let t = item.type.lowercased()
         if t.contains("bug") { return .red }
-        if t.contains("task") { return .yellow }
+        if t.contains("task") { return scheme == .dark ? .yellow : .orange }
         if t.contains("feature") || t.contains("epic") { return .purple }
         if t.contains("backlog") || t.contains("story") || t.contains("requirement") { return .blue }
         return .secondary
@@ -302,15 +304,16 @@ private struct TrackedPeopleSheet: View {
 /// test orange, preview / review teal, deployment and resolved green; anything else gray.
 struct WorkItemStateChip: View {
     let state: String
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let color = Self.color(state)
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 5, height: 5)
-            Text(state).lineLimit(1)
+            // Colored text reads on dark backgrounds; on light ones yellow / teal / orange wash out.
+            Text(state).lineLimit(1).foregroundStyle(scheme == .dark ? AnyShapeStyle(color) : AnyShapeStyle(.primary))
         }
         .font(.system(size: 10, weight: .semibold))
-        .foregroundStyle(color)
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
         .background(color.opacity(0.16), in: Capsule())

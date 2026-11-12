@@ -549,7 +549,11 @@ absolute and `~/` paths open, and a `:line` suffix is dropped.
   cards, no marketing copy, no "✨". Density like Xcode / Mail / Linear's macOS app.
 - Text sizes: body 13, secondary 11, monospaced code 12. Secondary info in `.secondary`.
 - One color per meaning: status colors (`Theme.color(for:)`), account dot color (`Theme.accountColor`),
-  category color (`Theme.categoryColor`), plus the app theme's own (below). Never more than these.
+  category color (`Theme.categoryColor`), plus the app theme's own (below), and Tracking › Work items'
+  palette: state chips (blocked red, in flight blue, new purple, waiting yellow, test orange, preview /
+  review teal, deployment / resolved green, else gray; text in the color only on dark backgrounds) and
+  type icons (bug red, task yellow / orange on light, feature / epic purple, backlog item / story blue).
+  Never more than these.
 - App themes (`HDCore/AppTheme.swift`, Settings › Appearance, `settings.appTheme`): Midnight Blue, Graphite,
   Warm Charcoal, all dark; nil = Classic, the system look with materials. A theme colors the window, sidebar
   column (painted edge to edge over the split view's material), title bar, session header, inspector and
