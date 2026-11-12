@@ -272,9 +272,13 @@ extension L {
     static var denyMessagePlaceholder: String { pick("e.g. use the test database instead", "ör. bunun yerine test veritabanını kullan") }
 
     // Usage
+    static var usageNoData: String { pick("no data yet", "veri yok") }
     static var usageHint: String { pick("Usage appears after the first reply.", "Kullanım ilk cevaptan sonra görünür.") }
     static var fiveHourShort: String { pick("5h", "5 sa") }
     static var weekShort: String { pick("Week", "Hafta") }
+    /// Footer meters, where every point of width counts.
+    static var fiveHourCompact: String { pick("5h", "5s") }
+    static var weekCompact: String { pick("7d", "7g") }
     static var noValue: String { "–" }
     static func percent(_ v: Double) -> String { isTurkish ? "%\(Int(v.rounded()))" : "\(Int(v.rounded()))%" }
     static func usageTooltip(account: Account, usage: AccountUsage?, now: Date) -> String {
