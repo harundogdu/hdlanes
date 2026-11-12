@@ -500,7 +500,7 @@ struct LoginTerminalSheet: View {
                         deviceCode.toggle()
                         restart()
                     }
-                    .help(L.deviceCodeDetail)
+                    .help(deviceCode ? L.browserLoginHelp : L.deviceCodeDetail)
                 }
                 Spacer()
                 // No default-button shortcut: Return must reach the terminal.
