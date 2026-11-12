@@ -145,6 +145,13 @@ struct SharedContextTests {
         #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/a/skills/alpha"))) == nil)
         #expect(fm.fileExists(atPath: t.sub("accounts/a/skills/gamma")))
 
+        // The default account's `synced` is never linked into an account that has none yet.
+        let other = try t.mkdir("accounts/b")
+        try t.mkdir("accounts/b/skills")
+        #expect(states(SharedContext.sync(accountDir: other, sourceDir: source, provider: .claude))["skills"] == .merged)
+        #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/b/skills/synced"))) == nil)
+        #expect(states(SharedContext.status(accountDir: other, sourceDir: source, provider: .claude))["skills"] == .merged)
+
         // Turning sharing off removes only our item links.
         #expect(SharedContext.unlink(accountDir: account, sourceDir: source, provider: .claude) == ["skills"])
         #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/a/skills/gamma"))) == nil)

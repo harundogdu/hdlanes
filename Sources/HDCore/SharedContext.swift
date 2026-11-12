@@ -123,9 +123,13 @@ public enum SharedContext {
         }
     }
 
-    /// Visible items of a default account's folder.
+    /// Items never shared: Claude Code keeps each login's claude.ai skills in `skills/synced`, and a link
+    /// there would make another account write into the default account's.
+    static let accountOwnItems: Set<String> = ["synced"]
+
+    /// Visible items of a default account's folder, minus each account's own.
     private static func sharedItems(_ folder: String, _ fm: FileManager) -> [String] {
-        ((try? fm.contentsOfDirectory(atPath: folder)) ?? []).filter { !$0.hasPrefix(".") }
+        ((try? fm.contentsOfDirectory(atPath: folder)) ?? []).filter { !$0.hasPrefix(".") && !accountOwnItems.contains($0) }
     }
 
     /// Paths in `folder` that are symlinks hdlanes made to `sourceFolder/<same name>`.

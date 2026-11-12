@@ -121,10 +121,12 @@ a symlink elsewhere) is never replaced; a link of ours whose target vanished is 
 later is linked next time. When the account has its own *folder* there (Claude Code creates
 `skills/synced` for claude.ai skills, so a managed account's `skills` is often a real folder), the
 default account's items are linked one by one inside it (`merged`), never over an item of the same
-name; item links whose target vanished go, and turning sharing off removes only those item links. Synced at app start, at account creation, on every launch of
+name and never `synced` (each login's own claude.ai skills); item links whose target vanished go, and
+turning sharing off removes only those item links. Editing a linked item edits the default account's copy. Synced at app start, at account creation, on every launch of
 a session on that account, and when the setting changes (off removes only our links). Never linked:
-`settings.json`, `.claude.json`, `config.toml`, `auth.json`, plugins, history. Because the links are
-whole folders, a skill installed from a managed account lands in the default account's folder.
+`settings.json`, `.claude.json`, `config.toml`, `auth.json`, plugins, history. Through a whole-folder
+link a skill installed from a managed account lands in the default account's folder; in a merged folder
+it stays in the account's own.
 
 **Memory** (Claude, verified with claude 2.1.318). Auto memory lives in
 `<config>/projects/<key>/memory/`, where `<key>` is the repository's main working tree (a linked
