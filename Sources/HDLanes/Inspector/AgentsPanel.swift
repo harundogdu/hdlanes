@@ -39,7 +39,8 @@ struct AgentsPanel: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(activity) { item in
-                        ActivityRow(item: item, agentLabel: item.agentID.map { types[$0] ?? L.subagent } ?? L.mainAgent)
+                        ActivityRow(item: item, agentLabel: item.agentID.map { types[$0] ?? L.subagent } ?? L.mainAgent,
+                                    isSubagent: item.agentID != nil)
                     }
                 }
             }
@@ -148,39 +149,120 @@ struct FinishedSubagentRow: View {
     }
 }
 
+/// One tool call: an icon for its kind, what it did in a line, and the tool, agent and time below.
 struct ActivityRow: View {
     let item: ActivityItem
     let agentLabel: String
+    /// nil for the main agent: only subagents are named on the row.
+    var isSubagent: Bool = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(item.at, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
-                .font(.system(size: 11, design: .monospaced))
+        let style = ToolStyle(item.tool)
+        let headline = item.summary ?? ToolStyle.readableArguments(item.detail).nilIfBlank ?? style.name
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: style.symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(item.failed ? Color.red : Color.secondary)
+                .frame(width: 22, height: 22)
+                .background(item.failed ? Color.red.opacity(0.12) : Color.secondary.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: headline)
+                    .font(.system(size: 12))
+                    .foregroundStyle(item.failed ? Color.red : Color.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                HStack(spacing: 4) {
+                    Text(verbatim: style.name).fontWeight(.medium)
+                    // The command itself, under the agent's description of it.
+                    if item.summary != nil, !item.detail.isEmpty {
+                        Text(verbatim: item.detail)
+                            .font(.system(size: 10.5, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    if isSubagent {
+                        Text(verbatim: "·")
+                        Text(verbatim: agentLabel).lineLimit(1)
+                    }
+                }
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            Text(verbatim: agentLabel)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: 70, alignment: .leading)
-            Text(verbatim: item.tool)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(item.failed ? Color.red : Color.primary)
-                .lineLimit(1)
-            Text(verbatim: item.detail)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(item.failed ? Color.red.opacity(0.8) : Color.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-            if item.isRunning {
-                ProgressView().controlSize(.mini)
-                    .help(L.running)
-            } else if item.failed {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .help(L.failed)
+            }
+            Spacer(minLength: 4)
+            Group {
+                if item.isRunning {
+                    ProgressView().controlSize(.mini).help(L.running)
+                } else if item.failed {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.red).help(L.failed)
+                } else {
+                    RelativeTimeText(date: item.at)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                        .help(Text(item.at, format: .dateTime.hour().minute().second()))
+                }
+            }
+            .padding(.top, 3)
+        }
+        .padding(.vertical, 3)
+        .help(item.detail)
+    }
+}
+
+/// Icon and readable name of a tool: Claude's built-ins, Codex's, and MCP tools (`mcp__server__action`).
+struct ToolStyle {
+    let name: String
+    let symbol: String
+
+    init(_ tool: String) {
+        switch tool {
+        case "Bash", "BashOutput", "KillShell", "shell", "exec_command", "local_shell":
+            symbol = "terminal"
+        case "Read", "NotebookRead", "view_image":
+            symbol = "doc.text"
+        case "Edit", "MultiEdit", "Write", "NotebookEdit", "apply_patch":
+            symbol = "pencil"
+        case "Grep", "Glob", "ToolSearch":
+            symbol = "magnifyingglass"
+        case "WebFetch", "WebSearch", "web_search":
+            symbol = "globe"
+        case "Agent", "Task", "SendMessage":
+            symbol = "person.2"
+        case "TodoWrite", "TaskCreate", "TaskUpdate", "update_plan":
+            symbol = "checklist"
+        case "AskUserQuestion":
+            symbol = "questionmark.bubble"
+        case "Skill":
+            symbol = "sparkles"
+        default:
+            symbol = tool.hasPrefix("mcp__") ? "puzzlepiece.extension" : "wrench.and.screwdriver"
+        }
+        name = Self.readable(tool)
+    }
+
+    /// A compact JSON object of arguments (an MCP call) → its plain values, `{"query":"invoice"}` → `invoice`.
+    /// Anything else comes back unchanged.
+    static func readableArguments(_ detail: String) -> String {
+        guard detail.hasPrefix("{"), let data = detail.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return detail }
+        let values = object.keys.sorted().compactMap { key -> String? in
+            switch object[key] {
+            case let s as String: return s.isEmpty ? nil : s
+            case let n as NSNumber: return n.stringValue
+            default: return nil
             }
         }
-        .help(item.detail)
+        return values.isEmpty ? detail : values.joined(separator: " · ")
+    }
+
+    /// `mcp__claude_ai_Microsoft_365__outlook_email_search` → `Microsoft 365 · outlook email search`.
+    static func readable(_ tool: String) -> String {
+        guard tool.hasPrefix("mcp__") else { return tool }
+        let rest = tool.dropFirst(5)
+        guard let r = rest.range(of: "__") else { return String(rest) }
+        var server = String(rest[..<r.lowerBound])
+        if server.hasPrefix("claude_ai_") { server.removeFirst("claude_ai_".count) }
+        let action = rest[r.upperBound...].replacingOccurrences(of: "_", with: " ")
+        return server.replacingOccurrences(of: "_", with: " ") + " · " + action
     }
 }

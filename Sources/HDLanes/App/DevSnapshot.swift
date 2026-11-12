@@ -1,4 +1,5 @@
 import AppKit
+import HDCore
 import Foundation
 import SwiftUI
 
@@ -22,6 +23,27 @@ enum DevSnapshot {
         var steps: [(String, () -> Void)] = []
         if let first = model.visibleSessions.first {
             steps.append(("session", { model.selection = .session(first.id) }))
+            // The Agents tab with made-up tool calls (the test home runs no agent).
+            steps.append(("session-agents", {
+                let runtime = model.runtimes[first.id] ?? SessionRuntime(sessionID: first.id)
+                let now = Date()
+                runtime.snapshot.activity = [
+                    ActivityItem(id: "1", at: now.addingTimeInterval(-600), agentID: nil, tool: "Read", detail: "UI/SessionRow.swift", isRunning: false),
+                    ActivityItem(id: "2", at: now.addingTimeInterval(-420), agentID: nil, tool: "Bash",
+                                 detail: "swift build 2>&1 | grep -E 'error|Build comp'", summary: "Build the app", isRunning: false),
+                    ActivityItem(id: "3", at: now.addingTimeInterval(-300), agentID: nil, tool: "Edit", detail: "Inspector/AgentsPanel.swift", isRunning: false),
+                    ActivityItem(id: "4", at: now.addingTimeInterval(-200), agentID: "a", tool: "Grep", detail: "ActivityItem(", isRunning: false),
+                    ActivityItem(id: "5", at: now.addingTimeInterval(-120), agentID: nil, tool: "mcp__claude_ai_Microsoft_365__outlook_email_search",
+                                 detail: #"{"query":"invoice"}"#, isRunning: false),
+                    ActivityItem(id: "6", at: now.addingTimeInterval(-60), agentID: nil, tool: "Bash", detail: "swift test",
+                                 summary: "Run the tests", isRunning: false, failed: true),
+                    ActivityItem(id: "7", at: now, agentID: nil, tool: "WebFetch", detail: "https://code.claude.com/docs/en/plugins", isRunning: true),
+                ]
+                runtime.snapshot.subagents = [SubagentInfo(id: "a", type: "Explore", description: "Find activity callers", startedAt: now.addingTimeInterval(-210))]
+                model.runtimes[first.id] = runtime
+                model.isInspectorVisible = true
+                model.inspectorTab = .agents
+            }))
             // The File tab with a file from the session's folder, as after clicking its path.
             let readme = URL(fileURLWithPath: first.worktreePath ?? first.cwd).appendingPathComponent("README.md")
             if FileManager.default.fileExists(atPath: readme.path) {

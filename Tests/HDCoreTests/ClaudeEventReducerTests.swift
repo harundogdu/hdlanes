@@ -489,6 +489,13 @@ struct ClaudeEventReducerTests {
         #expect(ClaudeToolSummary.detail(tool: "Bash", input: nil) == "")
     }
 
+    @Test func bashDescriptionIsTheActivitySummary() {
+        #expect(ClaudeToolSummary.summary(tool: "Bash", input: j(#"{"command":"ls -la","description":"List files\nmore"}"#)) == "List files …")
+        #expect(ClaudeToolSummary.summary(tool: "Bash", input: j(#"{"command":"ls"}"#)) == nil)
+        #expect(ClaudeToolSummary.summary(tool: "Bash", input: j(#"{"command":"ls","description":"  "}"#)) == nil)
+        #expect(ClaudeToolSummary.summary(tool: "Read", input: j(#"{"file_path":"/a","description":"x"}"#)) == nil)
+    }
+
     @Test func slimPayload() {
         let big = String(repeating: "a", count: 10_000)
         let payload = j(#"{"tool_name":"Write","tool_input":{"file_path":"/x","content":"\#(big)"},"tool_response":{"x":1},"last_assistant_message":"\#(big)"}"#)

@@ -103,15 +103,19 @@ public struct ActivityItem: Identifiable, Equatable, Sendable {
     public var agentID: String?
     public var tool: String
     public var detail: String
+    /// What the call is for, in the agent's words (Bash's `description`); nil when it gave none.
+    public var summary: String?
     public var isRunning: Bool
     public var failed: Bool
 
-    public init(id: String, at: Date, agentID: String?, tool: String, detail: String, isRunning: Bool, failed: Bool = false) {
+    public init(id: String, at: Date, agentID: String?, tool: String, detail: String, summary: String? = nil,
+                isRunning: Bool, failed: Bool = false) {
         self.id = id
         self.at = at
         self.agentID = agentID
         self.tool = tool
         self.detail = detail
+        self.summary = summary
         self.isRunning = isRunning
         self.failed = failed
     }
