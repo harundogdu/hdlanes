@@ -239,6 +239,11 @@ extension AppModel {
     // MARK: Day summary
 
     func daySummaryMarkdown(for day: Date, events: [ActivityEvent]) -> String {
+        daySummary(for: day, events: events).markdown
+    }
+
+    /// The day's report as data (for the screen) and as markdown (to copy or save), from the same inputs.
+    func daySummary(for day: Date, events: [ActivityEvent]) -> (report: DaySummary.Report, markdown: String, title: String) {
         let df = DateFormatter()
         df.locale = L.locale
         df.dateStyle = .full
@@ -261,8 +266,8 @@ extension AppModel {
             .map { DaySummary.Item(text: $0.title, detail: L.taskStatusName($0.status)) }
         var names: [UUID: String] = [:]
         for p in state.projects { names[p.id] = p.name }
-        return DaySummary.markdown(events: events, stillOpen: stillOpen, tomorrow: tomorrow, projectNames: names,
-                                   labels: labels, time: { tf.string(from: $0) })
+        let report = DaySummary.report(events: events, stillOpen: stillOpen, tomorrow: tomorrow, projectNames: names)
+        return (report, DaySummary.markdown(report, labels: labels, time: { tf.string(from: $0) }), df.string(from: day))
     }
 
     /// Writes `~/.hdlanes/reports/YYYY-MM-DD.md` and returns its URL.

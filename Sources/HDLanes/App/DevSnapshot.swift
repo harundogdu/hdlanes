@@ -52,6 +52,7 @@ enum DevSnapshot {
         }
         steps.append(("tracking", { model.selection = .tracking }))
         steps.append(("tracking-work-items", { model.tracking.tab = .workItems }))
+        steps.append(("tracking-day-summary", { model.tracking.tab = .daySummary }))
         steps.append(("inbox", { model.selection = .inbox }))
         steps.append(("board", { model.selection = .board }))
         // The Settings scene doesn't open from here; host the same view in a window of our own.

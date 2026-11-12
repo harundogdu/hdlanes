@@ -123,6 +123,11 @@ extension L {
     static var sumStillOpen: String { pick("Still open", "Açık kalanlar") }
     static var sumTomorrow: String { pick("For tomorrow", "Yarına") }
     static var sumNothing: String { pick("Nothing", "Yok") }
+    static var sumToday: String { pick("Today", "Bugün") }
+    static var sumPreviousDay: String { pick("Previous day", "Önceki gün") }
+    static var sumNextDay: String { pick("Next day", "Sonraki gün") }
+    static func sumTurns(_ n: Int) -> String { pick("\(n) turns", "\(n) tur") }
+    static var sumOpenSession: String { pick("Open the session", "Oturumu aç") }
 
     // Review sheet
     static var pullRequest: String { pick("Pull request", "PR") }
