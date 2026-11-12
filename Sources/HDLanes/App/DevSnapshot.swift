@@ -56,7 +56,7 @@ enum DevSnapshot {
             settingsWindow.center()
             settingsWindow.orderFront(nil)
         }))
-        for tab in ["general", "terminal", "accounts", "connections", "tasks"] {
+        for tab in ["general", "terminal", "accounts", "connections", "tasks", "mods"] {
             steps.append(("settings-\(tab)", {
                 defaults.set(tab, forKey: "hd.settingsTab")
                 settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(model))
@@ -77,8 +77,8 @@ enum DevSnapshot {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             let (name, action) = steps[index]
             action()
-            // Work items wait on `az boards query` calls.
-            DispatchQueue.main.asyncAfter(deadline: .now() + (name == "tracking-work-items" ? 60 : 1.5)) {
+            // Work items wait on `az boards query` calls; Mods on `claude plugin list`.
+            DispatchQueue.main.asyncAfter(deadline: .now() + (name == "tracking-work-items" ? 60 : name == "settings-mods" ? 10 : 1.5)) {
                 let window = name.hasPrefix("settings")
                     ? NSApp.windows.first { $0.identifier?.rawValue == "dev-settings" }
                     : NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
