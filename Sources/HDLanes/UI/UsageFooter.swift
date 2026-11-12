@@ -10,19 +10,27 @@ struct UsageFooter: View {
     @State private var showAccounts = false
 
     var body: some View {
-        let rows = footerAccounts
         let anyUsage = model.state.accounts.contains { model.usage(for: $0.id) != nil }
         VStack(spacing: 0) {
             if anyUsage {
                 Divider()
-                VStack(spacing: 6) {
-                    ForEach(rows) { account in
-                        Button { showAccounts = true } label: { UsageRow(account: account) }
-                            .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(groups, id: \.title) { group in
+                        VStack(alignment: .leading, spacing: 3) {
+                            if let title = group.title.nilIfBlank {
+                                Text(title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            ForEach(group.accounts) { account in
+                                Button { showAccounts = true } label: { UsageRow(account: account) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
             } else if !usageSeen && hasAgentSession {
                 Divider()
                 Text(L.usageHint)
@@ -42,60 +50,73 @@ struct UsageFooter: View {
         model.visibleSessions.contains { $0.provider.isAgent }
     }
 
-    /// Every Claude and Codex account, in account order; one that hasn't run yet shows dimmed with "—",
-    /// so a new account is there from the start.
-    private var footerAccounts: [Account] {
-        model.state.accounts.filter { $0.provider.isAgent }
+    /// Claude and Codex accounts grouped by the part of their name before " - " ("Fimple - Claude" →
+    /// "Fimple"), groups in order of first appearance; ungrouped names come last under no title.
+    private var groups: [(title: String, accounts: [Account])] {
+        var out: [(title: String, accounts: [Account])] = []
+        for account in model.state.accounts where account.provider.isAgent {
+            let title = AccountGrouping.split(account.label).group ?? ""
+            if let i = out.firstIndex(where: { $0.title == title }) { out[i].accounts.append(account) } else { out.append((title, [account])) }
+        }
+        return out.sorted { ($0.title.isEmpty ? 1 : 0) < ($1.title.isEmpty ? 1 : 0) }
     }
 }
 
+/// One account on one line: a chip with its color and name, its plan, then the 5-hour and weekly meters.
+/// A window not known now shows "—"; an account that never reported shows "no data".
 private struct UsageRow: View {
     let account: Account
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let usage = model.usage(for: account.id)
+        let name = AccountGrouping.split(account.label).name
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let stale = usage.map { context.date.timeIntervalSince($0.updatedAt) > 15 * 60 } ?? true
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    AccountDot(colorIndex: account.colorIndex, size: 7)
-                    Text(account.label)
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    if let plan = usage?.plan ?? account.plan {
-                        Text(plan.capitalized)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
+            HStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Circle().fill(Theme.accountColor(account.colorIndex)).frame(width: 6, height: 6)
+                    Text(name).lineLimit(1)
                 }
-                HStack(spacing: 10) {
-                    meter(L.fiveHourShort, usage?.fiveHour, now: context.date)
-                    meter(L.weekShort, usage?.week, now: context.date)
+                .font(.system(size: 11, weight: .medium))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Theme.accountColor(account.colorIndex).opacity(0.16), in: Capsule())
+                if let plan = usage?.plan ?? account.plan {
+                    Text(plan.capitalized)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 1))
                 }
-                .padding(.leading, 13)
+                Spacer(minLength: 4)
+                if let usage {
+                    meter(L.fiveHourCompact, usage.percent(\.fiveHour, at: context.date))
+                    meter(L.weekCompact, usage.percent(\.week, at: context.date))
+                } else {
+                    Text(L.usageNoData)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             }
-            .font(.system(size: 11))
-            .opacity(stale ? 0.55 : 1)
+            .opacity(stale ? 0.7 : 1)
             .contentShape(Rectangle())
             .help(L.usageTooltip(account: account, usage: usage, now: context.date))
         }
     }
 
-    private func meter(_ label: String, _ window: UsageWindow?, now: Date) -> some View {
-        let pct = window?.percent(at: now)
-        return HStack(spacing: 4) {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .fixedSize()
-            UsageMeter(percent: pct, color: meterColor(pct), width: nil)
-            Text(pct.map { L.percent($0) } ?? L.noValue)
+    private func meter(_ label: String, _ percent: Double?) -> some View {
+        HStack(spacing: 3) {
+            Text(label).foregroundStyle(.secondary)
+            UsageMeter(percent: percent, color: meterColor(percent), width: 26)
+            Text(percent.map { L.percent($0) } ?? L.noValue)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
+                .foregroundStyle(percent == nil ? .tertiary : .secondary)
+                .frame(minWidth: 26, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
+        .font(.system(size: 10))
+        .fixedSize()
     }
 
     /// Account color normally; orange from 80 %, red at the limit, so a full window stands out.

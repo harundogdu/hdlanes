@@ -196,6 +196,31 @@ public struct AccountUsage: Codable, Hashable, Sendable {
     }
 }
 
+extension AccountUsage {
+    /// A window's use as of `now`, or nil when it isn't known: no reading, or a window that had already
+    /// ended when this reading came and wasn't reported again (Claude Code drops `five_hour` at times),
+    /// so its old number says nothing about now.
+    public func percent(_ window: KeyPath<AccountUsage, UsageWindow?>, at now: Date) -> Double? {
+        guard let w = self[keyPath: window] else { return nil }
+        if let reset = w.resetsAt, reset <= updatedAt { return nil }
+        return w.percent(at: now)
+    }
+}
+
+/// "Fimple - Claude" → group "Fimple", name "Claude": accounts named "<group> - <name>" are shown together.
+public enum AccountGrouping {
+    public static func split(_ label: String) -> (group: String?, name: String) {
+        for separator in [" - ", " – ", " — "] {
+            if let r = label.range(of: separator) {
+                let group = label[..<r.lowerBound].trimmingCharacters(in: .whitespaces)
+                let name = label[r.upperBound...].trimmingCharacters(in: .whitespaces)
+                if !group.isEmpty, !name.isEmpty { return (group, name) }
+            }
+        }
+        return (nil, label)
+    }
+}
+
 public enum AppLanguage: String, Codable, CaseIterable, Sendable {
     case system, english, turkish
 }
