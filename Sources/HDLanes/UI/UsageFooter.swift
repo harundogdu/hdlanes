@@ -42,10 +42,10 @@ struct UsageFooter: View {
         model.visibleSessions.contains { $0.provider.isAgent }
     }
 
-    /// Accounts with known usage or a running session, in account order.
+    /// Every Claude and Codex account, in account order; one that hasn't run yet shows dimmed with "—",
+    /// so a new account is there from the start.
     private var footerAccounts: [Account] {
-        let live = Set(model.visibleSessions.filter { model.isSessionRunning($0.id) }.compactMap(\.accountID))
-        return model.state.accounts.filter { model.usage(for: $0.id) != nil || live.contains($0.id) }
+        model.state.accounts.filter { $0.provider.isAgent }
     }
 }
 
