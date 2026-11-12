@@ -524,4 +524,6 @@ absolute and `~/` paths open, and a `:line` suffix is dropped.
   fall back to the default). Colors an imported theme leaves out come from the default palette.
   `terminalFont` is a fixed-pitch family (nil = SF Mono). Changes apply to open terminals at once
   (`TerminalRegistry.applyAppearance`).
-- A session with an account shows the account's color as a 2 pt line above its terminal.
+- A session's terminal sits in a card (8 pt corners, 8 pt from the window chrome, room around the text);
+  the card's 1 px edge carries the account's color. Terminal lines are 110 % high (`lineSpacing = 1.1`;
+  SwiftTerm draws box characters itself, so frames stay joined).

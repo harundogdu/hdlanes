@@ -147,10 +147,11 @@ private struct SessionTerminalArea: View {
     let session: AgentSession
     @Environment(AppModel.self) private var model
 
-    static let cardRadius: CGFloat = 10
+    static let cardRadius: CGFloat = 8
 
     var body: some View {
         let account = model.account(session.accountID)
+        let palette = model.terminalPalette
         let shape = RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
         // The terminal sits in a card with room around the text; the card's edge carries the
         // account's color, so the account is visible at a glance.
@@ -166,11 +167,12 @@ private struct SessionTerminalArea: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
         }
-        .background(Color(nsColor: TerminalTheme.color(model.terminalPalette.background)))
+        .background(Color(nsColor: TerminalTheme.color(palette.background)))
         .clipShape(shape)
         .overlay {
             shape.strokeBorder(account.map { Theme.accountColor($0.colorIndex).opacity(0.55) }
-                               ?? Color.primary.opacity(0.1), lineWidth: 1)
+                               ?? (palette.isDark ? Color.white : Color.black).opacity(0.12), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .padding(8)
         .background(Color(nsColor: .windowBackgroundColor))
