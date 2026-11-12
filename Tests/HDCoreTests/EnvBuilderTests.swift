@@ -434,8 +434,9 @@ struct EnvBuilderTests {
         claude.resume = true
         #expect(!EnvBuilder.agentInvocation(claude).contains("--fork-session"))
 
+        // Codex forks aren't offered yet (the rollout watcher hasn't been checked against a fork).
         var codex = EnvBuilder.AgentLaunch(provider: .codex, account: nil, title: "", agentSessionID: nil, resume: false)
         codex.forkFrom = "thread-1"
-        #expect(EnvBuilder.agentInvocation(codex).hasSuffix("codex fork 'thread-1'"))
+        #expect(!EnvBuilder.agentInvocation(codex).contains("fork"))
     }
 }

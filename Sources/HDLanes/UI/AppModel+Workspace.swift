@@ -32,6 +32,8 @@ enum WorkspaceError: LocalizedError, Equatable {
     case noAccount(Provider)
     case systemAccount
     case accountInUse(Int)
+    /// Other open sessions work in the worktree that would be removed.
+    case worktreeInUse(Int)
     case notManaged
     case emptySecret
     case cliMissing(Provider)
@@ -50,6 +52,7 @@ enum WorkspaceError: LocalizedError, Equatable {
         case .noAccount(let p): return L.errNoAccount(p)
         case .systemAccount: return L.errSystemAccount
         case .accountInUse(let n): return L.errAccountInUse(n)
+        case .worktreeInUse(let n): return L.errWorktreeInUse(n)
         case .notManaged: return L.errNotManaged
         case .emptySecret: return L.errEmptySecret
         case .cliMissing(let p): return L.cliMissing(p)
@@ -235,9 +238,10 @@ extension AppModel {
         return copy.id
     }
 
-    /// A conversation to copy: an agent session that has talked at least once.
+    /// A conversation to copy: a Claude session that finished at least one turn. Codex (`codex fork`)
+    /// waits until its forked rollout has been checked against the rollout watcher.
     func canFork(_ session: AgentSession) -> Bool {
-        session.provider.isAgent && session.agentSessionID?.nilIfBlank != nil && session.lastActivityAt != nil
+        session.provider == .claude && session.agentSessionID?.nilIfBlank != nil && session.lastResultAt != nil
     }
 
     func defaultSessionTitle(_ provider: Provider, in projectID: UUID) -> String {
@@ -250,6 +254,12 @@ extension AppModel {
     func closeSessionThrowing(_ id: UUID, removeWorktree: Bool) async throws {
         guard let session = session(id) else { return }
         if removeWorktree, let path = session.worktreePath {
+            // A copy (same settings / fork) may work in this folder; removing it would pull the floor out.
+            let root = HDPaths.normalizedDirString(path)
+            let others = visibleSessions.filter {
+                $0.id != id && (HDPaths.normalizedDirString($0.cwd) == root || $0.cwd.hasPrefix(root + "/"))
+            }
+            if !others.isEmpty { throw WorkspaceError.worktreeInUse(others.count) }
             if let risks = try await worktreeRemovalRisks(sessionID: id), risks.needsConfirmation {
                 throw GitError.worktreeDirty(path: path, risks: risks)
             }

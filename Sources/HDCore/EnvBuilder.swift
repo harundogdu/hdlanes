@@ -133,7 +133,7 @@ public enum EnvBuilder {
         /// Raw shell command run before the agent (project setup in a fresh worktree).
         public var setupCommand: String?
         /// Start as a copy of this conversation: Claude `--resume <id> --fork-session` (with
-        /// `agentSessionID` as the copy's `--session-id`), Codex `fork <id>`. Ignored when `resume`.
+        /// `agentSessionID` as the copy's `--session-id`). Ignored when `resume` and for Codex.
         public var forkFrom: String? = nil
         /// Printed when the setup command fails; the agent starts anyway.
         public var setupFailedNotice: String
@@ -176,8 +176,6 @@ public enum EnvBuilder {
             parts.append("codex")
             if launch.resume, let id = launch.agentSessionID, !id.isEmpty {
                 parts.append("resume \(ShellQuote.quote(id))")
-            } else if let source = launch.forkFrom, !source.isEmpty {
-                parts.append("fork \(ShellQuote.quote(source))")
             }
             if let prompt { parts.append(promptArgument(prompt)) }
         case .shell:

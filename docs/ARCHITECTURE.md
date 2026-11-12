@@ -108,10 +108,12 @@ Shell quoting: single-quote every interpolated value (`'` → `'\''`).
 
 **Fork / same settings** (session context menu, `AppModel.duplicateSession`). A new session in the same
 project, folder, branch, provider and account; it never owns the worktree (`worktreePath` nil), so
-closing it can't remove the original's. "Fork Conversation" (agent sessions that have talked) stores
-`forkedFromAgentSessionID` and its first launch runs `claude --resume <old> --fork-session --session-id
-<new>` (claude 2.1.322 accepts `--session-id` with `--resume` only together with `--fork-session`) or
-`codex fork <thread>`; later launches resume the fork's own id.
+closing it can't remove the original's; removing a worktree is refused while another open session
+works in it (`WorkspaceError.worktreeInUse`). "Fork Conversation" (Claude sessions that finished a turn)
+stores `forkedFromAgentSessionID` and its first launch runs `claude --resume <old> --fork-session
+--session-id <new>` (claude 2.1.322 accepts `--session-id` with `--resume` only together with
+`--fork-session`); later launches resume the fork's own id. Codex has `codex fork <thread>`, not offered
+yet: the rollout watcher hasn't been checked against a forked rollout (thread id, start time, history).
 
 ## Shared context (runtime area)
 
