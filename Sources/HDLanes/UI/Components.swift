@@ -157,24 +157,30 @@ struct CompactEmptyState: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .light))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.tint.opacity(0.14)))
+                .padding(.bottom, 2)
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 13, weight: .semibold))
+                .multilineTextAlignment(.center)
             if let detail {
                 Text(detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
+                    .lineSpacing(2)
+                    .frame(maxWidth: 260)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .controlSize(.small)
-                    .padding(.top, 2)
+                    .padding(.top, 4)
             }
         }
         .padding(16)

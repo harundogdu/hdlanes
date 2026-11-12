@@ -8,7 +8,6 @@ extension L {
     static var tabChanges: String { pick("Changes", "Değişiklikler") }
     static var tabAgents: String { pick("Agents", "Ajanlar") }
     static var tabBrowser: String { pick("Browser", "Tarayıcı") }
-    static func tabWithCount(_ title: String, _ count: Int) -> String { count > 0 ? "\(title) \(count)" : title }
     static var inspectorSessionMissing: String { pick("Session not found", "Oturum bulunamadı") }
     static var inspectorSessionMissingDetail: String {
         pick("Select a session in the sidebar.", "Kenar çubuğundan bir oturum seç.")
