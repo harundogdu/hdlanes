@@ -74,6 +74,8 @@ final class AppModel {
     @ObservationIgnored let terminals = TerminalRegistry()
     /// Colors of every terminal (`UI/AppModel+Appearance.swift`).
     var terminalPalette: TerminalPalette = .standard
+    /// Window colors (`UI/AppModel+Appearance.swift`); nil = Klasik, the system look.
+    var appTheme: AppTheme?
 
     // Runtime area (Runtime/)
     @ObservationIgnored var runtimeServices = RuntimeServices()
@@ -114,6 +116,7 @@ final class AppModel {
             break
         }
         terminalPalette = TerminalPalette.resolve(state.settings.terminalTheme, themesDir: paths.themesDir)
+        appTheme = AppTheme.resolve(state.settings.appTheme)
         terminals.model = self
     }
 

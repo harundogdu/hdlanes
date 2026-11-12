@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Launched from a terminal (swift run), the process isn't a regular app until told so.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        model.applyAppAppearance()
         model.start()
         DevSnapshot.runIfRequested(model: model)
     }

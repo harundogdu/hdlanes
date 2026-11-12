@@ -10,6 +10,7 @@ struct MainWindow: View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 270, ideal: 310, max: 460)
+                .modifier(ThemedColumn(theme: model.appTheme))
         } detail: {
             VStack(spacing: 0) {
                 if let warning = model.loadWarning {
@@ -19,8 +20,13 @@ struct MainWindow: View {
                 }
                 DetailContent()
             }
+            .themeBackground(model.appTheme, \.window)
+            // Lists and scroll views inside draw on the theme's panels, not their own grey.
+            .scrollContentBackground(model.appTheme == nil ? .automatic : .hidden)
         }
         .toolbar { MainToolbar() }
+        .modifier(ThemedToolbar(theme: model.appTheme))
+        .themeColors(model.appTheme)
         .sheet(isPresented: $model.isNewSessionSheetPresented) { NewSessionSheet() }
         .sheet(isPresented: $model.isNewTaskSheetPresented) { TaskEditorSheet(taskID: nil) }
         .sheet(isPresented: $model.isAddAccountSheetPresented) { AddAccountSheet() }
@@ -54,6 +60,34 @@ private struct DetailContent: View {
             InboxView()
         case nil:
             WelcomeView()
+        }
+    }
+}
+
+/// The sidebar column in the theme's color; without it the split view's material shows through.
+private struct ThemedColumn: ViewModifier {
+    let theme: AppTheme?
+
+    func body(content: Content) -> some View {
+        if let theme {
+            content.background(Theme.color(theme.sidebar).ignoresSafeArea())
+        } else {
+            content
+        }
+    }
+}
+
+/// The title bar in the theme's sidebar color, so the window reads as one surface.
+private struct ThemedToolbar: ViewModifier {
+    let theme: AppTheme?
+
+    func body(content: Content) -> some View {
+        if let theme {
+            content
+                .toolbarBackground(Theme.color(theme.sidebar), for: .windowToolbar)
+                .toolbarBackground(.visible, for: .windowToolbar)
+        } else {
+            content
         }
     }
 }

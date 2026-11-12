@@ -33,7 +33,7 @@ struct UsageFooter: View {
                     .padding(.vertical, 6)
             }
         }
-        .background(.bar)
+        .modifier(BarBackground(theme: model.appTheme))
         .onChange(of: anyUsage, initial: true) { _, has in if has { usageSeen = true } }
         .sheet(isPresented: $showAccounts) { AccountsSheet() }
     }
@@ -123,5 +123,14 @@ struct AccountsSheet: View {
             .padding(12)
         }
         .frame(width: 600, height: 520)
+    }
+}
+
+/// `.bar`, or the theme's sidebar color.
+struct BarBackground: ViewModifier {
+    let theme: AppTheme?
+
+    func body(content: Content) -> some View {
+        if let theme { content.background(Theme.color(theme.sidebar)) } else { content.background(.bar) }
     }
 }

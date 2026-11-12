@@ -9,7 +9,7 @@ struct TrackingSidebarRow: View {
     var body: some View {
         let count = model.trackingAttentionCount
         HStack {
-            Label(L.tracking, systemImage: "checklist")
+            Label { Text(L.tracking) } icon: { NavIcon(symbol: "checklist", tint: 0) }
             Spacer()
             if count > 0 {
                 Text(verbatim: "\(count)")

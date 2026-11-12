@@ -86,6 +86,15 @@ public struct TerminalPalette: Hashable, Sendable, Identifiable {
             "15161e", "f7768e", "9ece6a", "e0af68", "7aa2f7", "bb9af7", "7dcfff", "a9b1d6",
             "414868", "f7768e", "9ece6a", "e0af68", "7aa2f7", "bb9af7", "7dcfff", "c0caf5",
         ]),
+        // Drawn for the Graphite and Warm Charcoal app themes (`AppTheme`).
+        make("graphite", "Graphite", bg: "141416", fg: "ececf0", [
+            "1d1f23", "ef6b73", "7fcf8a", "f0c070", "7c86f2", "c38fe8", "4cc2b3", "c8ccd4",
+            "5c6370", "ff838b", "95dfa0", "f5d08f", "98a1f7", "d6a6f0", "6fd6c8", "f2f2f6",
+        ]),
+        make("warm-charcoal", "Warm Charcoal", bg: "211c18", fg: "efe6dc", [
+            "2a231e", "ec7a6d", "a7c080", "e2b86b", "8fa9c4", "c99ab4", "89b8a6", "d9cfc4",
+            "6b5d52", "f2948a", "bad39a", "edc98a", "a6bdd4", "d6aec4", "9ccbb9", "f5ede4",
+        ]),
     ]
 
     // MARK: Imported themes

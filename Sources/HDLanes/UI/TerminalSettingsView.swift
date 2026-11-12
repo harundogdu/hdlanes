@@ -13,6 +13,21 @@ struct TerminalSettingsView: View {
 
     var body: some View {
         Form {
+            Section(L.appThemeSection) {
+                Picker(L.appThemeLabel, selection: Binding(
+                    get: { model.appTheme?.id ?? "" },
+                    set: { model.setAppTheme($0.isEmpty ? nil : $0) })) {
+                    Text(L.appThemeName(nil)).tag("")
+                    ForEach(AppTheme.builtIn) { Text(L.appThemeName($0.id)).tag($0.id) }
+                }
+                HStack(spacing: 10) {
+                    ForEach(AppTheme.builtIn) { ThemeSwatch(theme: $0, selected: model.appTheme?.id == $0.id) { model.setAppTheme($0) } }
+                }
+                Text(L.appThemeNote)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section(L.terminalColors) {
                 Picker(L.terminalTheme, selection: Binding(
                     get: { model.terminalPalette.id },
@@ -92,5 +107,41 @@ private struct PaletteSwatch: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: TerminalTheme.color(palette.background)), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// A small picture of a theme: sidebar, window and accent, clickable.
+private struct ThemeSwatch: View {
+    let theme: AppTheme
+    let selected: Bool
+    let pick: (String) -> Void
+
+    var body: some View {
+        Button { pick(theme.id) } label: {
+            VStack(spacing: 5) {
+                HStack(spacing: 0) {
+                    Theme.color(theme.sidebar).frame(width: 26)
+                    ZStack(alignment: .topLeading) {
+                        Theme.color(theme.window)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Capsule().fill(Theme.color(theme.accent)).frame(width: 30, height: 5)
+                            Capsule().fill(Theme.color(theme.muted)).frame(width: 44, height: 4)
+                            Capsule().fill(Theme.color(theme.accent2)).frame(width: 22, height: 4)
+                        }
+                        .padding(8)
+                    }
+                }
+                .frame(width: 104, height: 58)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(selected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: selected ? 2 : 1)
+                }
+                Text(L.appThemeName(theme.id)).font(.system(size: 11))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

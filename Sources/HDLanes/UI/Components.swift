@@ -181,3 +181,51 @@ struct CompactEmptyState: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+/// A sidebar destination's icon: a colored tile under a theme, the plain symbol in Klasik.
+struct NavIcon: View {
+    let symbol: String
+    /// Index into `AppTheme.navTints`.
+    let tint: Int
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let theme = model.appTheme, theme.navTints.indices.contains(tint) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Theme.color(theme.navTints[tint]), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+        } else {
+            Image(systemName: symbol)
+        }
+    }
+}
+
+/// Status as a colored pill (themes) or glyph + text (Klasik).
+struct StatusPill: View {
+    let status: AgentStatus
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if model.appTheme != nil {
+            HStack(spacing: 6) {
+                StatusGlyph(status: status, size: 10)
+                Text(L.statusText(status)).lineLimit(1)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.color(for: status))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .background(Theme.color(for: status).opacity(0.15), in: Capsule())
+        } else {
+            HStack(spacing: 8) {
+                StatusGlyph(status: status)
+                Text(L.statusText(status))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}

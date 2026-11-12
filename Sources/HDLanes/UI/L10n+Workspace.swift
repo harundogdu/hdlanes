@@ -582,7 +582,22 @@ extension L {
 // OWNER: workspace area. Settings › Terminal.
 extension L {
     static var terminalSample: String { pick("~/git/hdlanes $ claude", "~/git/hdlanes $ claude") }
-    static var terminalColors: String { pick("Colors", "Renkler") }
+    static var terminalColors: String { pick("Terminal Colors", "Terminal Renkleri") }
+    static var appearanceTab: String { pick("Appearance", "Görünüm") }
+    static var appThemeSection: String { pick("Window", "Pencere") }
+    static var appThemeLabel: String { pick("Theme", "Tema") }
+    static func appThemeName(_ id: String?) -> String {
+        switch id {
+        case AppTheme.navyID?: return pick("Midnight Blue", "Gece Mavisi")
+        case AppTheme.graphiteID?: return pick("Graphite", "Grafit")
+        case AppTheme.warmID?: return pick("Warm Charcoal", "Sıcak Kömür")
+        default: return pick("Classic (system)", "Klasik (sistem)")
+        }
+    }
+    static var appThemeNote: String {
+        pick("Colors the sidebar, header, panels and terminal together. Picking a theme also picks its terminal colors; you can change those below afterwards.",
+             "Kenar çubuğunu, başlığı, panelleri ve terminali birlikte renklendirir. Tema seçmek terminal renklerini de seçer; sonra aşağıdan değiştirebilirsin.")
+    }
     static var terminalTheme: String { pick("Theme", "Tema") }
     static var importThemeEllipsis: String { pick("Import Theme…", "Tema İçe Aktar…") }
     static var showThemesFolder: String { pick("Themes Folder", "Temalar Klasörü") }

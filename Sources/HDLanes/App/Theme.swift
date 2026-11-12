@@ -48,6 +48,30 @@ enum Theme {
         id.flatMap { categoryColors[$0] } ?? .secondary
     }
 
+    static func color(_ rgb: RGB, opacity: Double = 1) -> Color {
+        Color(.sRGB, red: rgb.r, green: rgb.g, blue: rgb.b, opacity: opacity)
+    }
+
     static let mono = Font.system(.body, design: .monospaced)
     static let monoSmall = Font.system(size: 11, design: .monospaced)
+}
+
+extension View {
+    /// Fills the background with the app theme's `color`, or leaves the system look (Klasik).
+    @ViewBuilder
+    func themeBackground(_ theme: AppTheme?, _ color: KeyPath<AppTheme, RGB>) -> some View {
+        if let theme { background(Theme.color(theme[keyPath: color])) } else { self }
+    }
+
+    /// The theme's text color and accent for everything inside, dark controls included.
+    @ViewBuilder
+    func themeColors(_ theme: AppTheme?) -> some View {
+        if let theme {
+            foregroundStyle(Theme.color(theme.text))
+                .tint(Theme.color(theme.accent))
+                .preferredColorScheme(.dark)
+        } else {
+            self
+        }
+    }
 }
