@@ -40,14 +40,38 @@ public enum DaySummary {
         }
     }
 
-    /// Builds the report. `events` are the day's activity events (any order); `projectNames` labels
-    /// them; `time` formats a time of day. Finished turns are grouped per session (latest result wins).
-    public static func markdown(events: [ActivityEvent], stillOpen: [Item], tomorrow: [Item],
-                                projectNames: [UUID: String], labels: Labels, time: (Date) -> String) -> String {
-        let sorted = events.sorted { $0.at < $1.at }
-        var out = "# \(labels.title)\n"
+    /// A session that finished turns that day: its last result, how many turns, when.
+    public struct Done: Equatable, Sendable, Identifiable {
+        public var id: String
+        public var sessionID: UUID?
+        public var title: String
+        public var project: String?
+        public var turns: Int
+        public var at: Date
+        /// First line of the last result.
+        public var result: String?
+    }
 
-        // Done: one line per session, its last finished turn.
+    /// A pull request opened or merged that day.
+    public struct PullRequestLine: Equatable, Sendable {
+        public var title: String
+        public var url: String?
+    }
+
+    /// The day's report as data, for the screen; `markdown` writes the same thing as text.
+    public struct Report: Equatable, Sendable {
+        public var done: [Done]
+        public var opened: [PullRequestLine]
+        public var merged: [PullRequestLine]
+        public var stillOpen: [Item]
+        public var tomorrow: [Item]
+    }
+
+    /// `events` are the day's activity events (any order); `projectNames` labels them. Finished turns
+    /// are grouped per session (latest result wins), in order of their last turn.
+    public static func report(events: [ActivityEvent], stillOpen: [Item], tomorrow: [Item],
+                              projectNames: [UUID: String]) -> Report {
+        let sorted = events.sorted { $0.at < $1.at }
         var order: [String] = []
         var lastDone: [String: ActivityEvent] = [:]
         var turns: [String: Int] = [:]
@@ -57,33 +81,49 @@ public enum DaySummary {
             lastDone[key] = e
             turns[key, default: 0] += 1
         }
+        let done = order.compactMap { key -> Done? in
+            guard let e = lastDone[key] else { return nil }
+            return Done(id: key, sessionID: e.sessionID, title: inline(e.title),
+                        project: e.projectID.flatMap { projectNames[$0] }.map(inline),
+                        turns: turns[key] ?? 1, at: e.at, result: firstLine(e.detail).map(inline))
+        }.sorted { $0.at < $1.at }
+        return Report(done: done,
+                      opened: sorted.filter { $0.kind == .prOpened }.map { PullRequestLine(title: $0.title, url: $0.prURL) },
+                      merged: sorted.filter { $0.kind == .prMerged }.map { PullRequestLine(title: $0.title, url: $0.prURL) },
+                      stillOpen: stillOpen, tomorrow: tomorrow)
+    }
+
+    /// The report as markdown, to copy or save. `time` formats a time of day.
+    public static func markdown(events: [ActivityEvent], stillOpen: [Item], tomorrow: [Item],
+                                projectNames: [UUID: String], labels: Labels, time: (Date) -> String) -> String {
+        markdown(report(events: events, stillOpen: stillOpen, tomorrow: tomorrow, projectNames: projectNames),
+                 labels: labels, time: time)
+    }
+
+    public static func markdown(_ r: Report, labels: Labels, time: (Date) -> String) -> String {
+        var out = "# \(labels.title)\n"
         out += "\n## \(labels.done)\n\n"
-        if order.isEmpty {
+        if r.done.isEmpty {
             out += "- \(labels.nothing)\n"
         } else {
-            for key in order.sorted(by: { lastDone[$0]!.at < lastDone[$1]!.at }) {
-                let e = lastDone[key]!
-                var line = "- **\(inline(e.title))**"
-                if let p = e.projectID.flatMap({ projectNames[$0] }) { line += " (\(inline(p)))" }
-                if let n = turns[key], n > 1 { line += " ×\(n)" }
-                line += " · \(time(e.at))"
-                if let first = firstLine(e.detail) { line += "\n  \(inline(first))" }
+            for d in r.done {
+                var line = "- **\(d.title)**"
+                if let p = d.project { line += " (\(p))" }
+                if d.turns > 1 { line += " ×\(d.turns)" }
+                line += " · \(time(d.at))"
+                if let first = d.result { line += "\n  \(first)" }
                 out += line + "\n"
             }
         }
-
-        let opened = sorted.filter { $0.kind == .prOpened }
-        let merged = sorted.filter { $0.kind == .prMerged }
         out += "\n## \(labels.pullRequests)\n\n"
-        if opened.isEmpty && merged.isEmpty {
+        if r.opened.isEmpty && r.merged.isEmpty {
             out += "- \(labels.nothing)\n"
         } else {
-            for e in opened { out += "- \(labels.opened): \(link(e.title, e.prURL))\n" }
-            for e in merged { out += "- \(labels.merged): \(link(e.title, e.prURL))\n" }
+            for e in r.opened { out += "- \(labels.opened): \(link(e.title, e.url))\n" }
+            for e in r.merged { out += "- \(labels.merged): \(link(e.title, e.url))\n" }
         }
-
-        out += "\n## \(labels.stillOpen)\n\n" + list(stillOpen, nothing: labels.nothing)
-        out += "\n## \(labels.tomorrow)\n\n" + list(tomorrow, nothing: labels.nothing)
+        out += "\n## \(labels.stillOpen)\n\n" + list(r.stillOpen, nothing: labels.nothing)
+        out += "\n## \(labels.tomorrow)\n\n" + list(r.tomorrow, nothing: labels.nothing)
         return out
     }
 
