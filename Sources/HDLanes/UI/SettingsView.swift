@@ -22,6 +22,9 @@ struct SettingsView: View {
             TaskSettings()
                 .tabItem { Label(L.tasksTab, systemImage: "checklist") }
                 .tag("tasks")
+            ModsView()
+                .tabItem { Label(L.modsTab, systemImage: "puzzlepiece.extension") }
+                .tag("mods")
         }
         .frame(width: 620, height: 500)
     }

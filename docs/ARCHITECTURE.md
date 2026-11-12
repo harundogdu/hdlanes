@@ -49,6 +49,7 @@ accounts/codex/<uuid>/             CODEX_HOME of a managed Codex account (0700);
                                    prompts may be symlinks into ~/.codex
 plugin/claude/                     generated plugin: .claude-plugin/plugin.json + hooks/hooks.json
 themes/                            imported terminal themes (Ghostty files, .itermcolors)
+mods/claude-code-playground/       sparse clone of Anthropic's sample mods; a local marketplace loads from it
 run/hd.sock                        hook socket (run/ is 0700)
 run/sessions/<uuid>/mcp.json       per-session --mcp-config of the session's MCP connections (0600, no secrets)
 run/sessions/<uuid>/settings.json  per-session --settings (statusLine → hdlanes-hook statusline,
@@ -451,6 +452,26 @@ connectors such as Microsoft 365, Gmail, Slack, or that account's MCP servers).
   other MCP tool (`permission_denials`); the init line lists claude.ai connector tools and a
   `needs-auth` status for a connector that isn't signed in for `-p`. Not run against real mail.
 
+## Mods (workspace area)
+
+Claude Code mods (TypeScript plugins, Claude Code ≥ 2.1.287) draw inside Claude Code's own TUI, so the
+session terminal needs nothing. Settings › Mods (`UI/ModsView.swift`, `UI/AppModel+Mods.swift`,
+`HDCore/Mods.swift`) installs them per Claude account through `runAccountCLI`, i.e. with the account's
+`CLAUDE_CONFIG_DIR` (verified with 2.1.322: a fresh config dir lists no plugins):
+
+- List: `claude plugin list --json` (`[{id, version, enabled, …}]`). Built-ins aren't listed; You Should Know's
+  switch is `enabledPlugins["cc-plugin-you-should-know@builtin"]` in the account's settings.json.
+- Install: `claude plugin install <name> --marketplace <owner/repo | path> --json` → one line
+  `{"outcome":"ok"|"failed","message":…}`. A `shownCommand {command, sha256}` is shown to the user and only
+  then re-run with `--accept-command <sha256>`; never `-y`.
+- Enable / disable / uninstall: `claude plugin <verb> <id> --json`, same result line.
+- Anthropic's samples (claude-code-playground has no root marketplace) are sparse-cloned into
+  `mods/claude-code-playground/` and installed from `claude-code/mods` as a local marketplace, which loads
+  in place — the clone stays.
+- `ModCatalog.entries` carries the L0–L3 grade of the awesome-claude-code-mods catalogue (not an Anthropic
+  concept). L2, L3, ungraded and hand-typed installs ask first. Running sessions pick changes up with
+  `/reload-plugins`; hdlanes doesn't type it for the user.
+
 ## AI category suggestion (workspace area)
 
 Off unless `settings.aiCategorization`. `settings.aiProvider` picks the model (nil = `claude`):
@@ -470,7 +491,7 @@ Off unless `settings.aiCategorization`. `settings.aiProvider` picks the model (n
 | shell (done) | `App/*`, `HDCore/{Models,Paths,StateStore,HookProtocol,RuntimeTypes}.swift` | AppModel, SessionRuntime, TerminalRegistry, Theme, L |
 | runtime | `Runtime/*`, `HDHook/*`, `HDCore/{EnvBuilder,ShellQuote,ClaudeEventReducer,CodexRollout,UsageParser,SharedContext,Connections}.swift` + tests | `Runtime/AppModel+Runtime.swift` signatures |
 | git | `Git/*`, `Inspector/*`, `HDCore/{DiffModels,DiffParser,WorktreePlanner,FilePreview}.swift` + tests | `Git/AppModel+Git.swift` signatures, `InspectorView(sessionID:)` |
-| workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner,Jev}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
+| workspace | `UI/*`, `HDCore/{Categorizer,ImportScanner,Jev,Mods}.swift` + tests, `scripts/build-app.sh`, `Resources/*` | `UI/AppModel+Workspace.swift` signatures, `MainWindow`, `SettingsView`, `AppCommands` |
 | inbox | `Inbox/*`, `HDCore/Inbox.swift` + tests | `Inbox/AppModel+Inbox.swift` (`refreshInbox`, `sendInboxReply`, `loadInboxTools`) |
 | tracking | `Tracking/*`, `HDCore/{ActivityLog,PullRequest,PullRequestParsers,DaySummary,Paths+Tracking,WorkItem}.swift` + tests | `Tracking/AppModel+Tracking.swift` (`recordActivity`, `trackingStatusChanged`, `pullRequestOpened`, `recordTaskMoved`) |
 
