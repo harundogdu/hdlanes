@@ -15,18 +15,7 @@ struct InspectorView: View {
                 CompactEmptyState(title: L.inspectorSessionMissing, symbol: "sidebar.right",
                                   detail: L.inspectorSessionMissingDetail)
             } else {
-                Picker(selection: $model.inspectorTab) {
-                    ForEach(InspectorTab.allCases) { tab in
-                        Text(title(for: tab)).tag(tab)
-                    }
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                InspectorTabBar(selection: $model.inspectorTab, count: count(for:))
                 Divider()
                 Group {
                     switch model.inspectorTab {
@@ -43,12 +32,11 @@ struct InspectorView: View {
         .task(id: sessionID) { await autoRefresh() }
     }
 
-    private func title(for tab: InspectorTab) -> String {
+    private func count(for tab: InspectorTab) -> Int {
         switch tab {
-        case .changes: return L.tabWithCount(L.tabChanges, model.diffs[sessionID]?.files.count ?? 0)
-        case .agents: return L.tabWithCount(L.tabAgents, model.runtimes[sessionID]?.snapshot.runningSubagents.count ?? 0)
-        case .browser: return L.tabBrowser
-        case .file: return L.tabFile
+        case .changes: return model.diffs[sessionID]?.files.count ?? 0
+        case .agents: return model.runtimes[sessionID]?.snapshot.runningSubagents.count ?? 0
+        case .browser, .file: return 0
         }
     }
 
@@ -75,5 +63,89 @@ struct InspectorView: View {
         guard let snapshot = model.runtimes[sessionID]?.snapshot else { return "" }
         let last = snapshot.activity.last
         return "\(snapshot.activity.count)|\(last?.id ?? "")|\(last?.isRunning ?? false)|\(snapshot.status)"
+    }
+}
+
+/// The inspector's tabs: icon, name and a count badge; the chosen one sits on an accent wash.
+/// Narrow panels drop the names and keep icons (names stay in the tooltip).
+private struct InspectorTabBar: View {
+    @Binding var selection: InspectorTab
+    let count: (InspectorTab) -> Int
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(showTitles: true)
+            row(showTitles: false)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+    }
+
+    private func row(showTitles: Bool) -> some View {
+        HStack(spacing: 2) {
+            ForEach(InspectorTab.allCases) { tab in
+                InspectorTabButton(tab: tab, selected: selection == tab, count: count(tab), showTitle: showTitles) {
+                    selection = tab
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct InspectorTabButton: View {
+    let tab: InspectorTab
+    let selected: Bool
+    let count: Int
+    let showTitle: Bool
+    let select: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: select) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 11, weight: .medium))
+                if showTitle { Text(title).lineLimit(1) }
+                if count > 0 {
+                    Text(verbatim: "\(count)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .monospacedDigit()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(selected ? AnyShapeStyle(.tint.opacity(0.25)) : AnyShapeStyle(.quaternary)))
+                }
+            }
+            .font(.system(size: 12, weight: selected ? .semibold : .regular))
+            .foregroundStyle(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(selected ? AnyShapeStyle(.tint.opacity(0.14)) : AnyShapeStyle(hovering ? Color.primary.opacity(0.06) : .clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var title: String {
+        switch tab {
+        case .changes: return L.tabChanges
+        case .agents: return L.tabAgents
+        case .browser: return L.tabBrowser
+        case .file: return L.tabFile
+        }
+    }
+
+    private var symbol: String {
+        switch tab {
+        case .changes: return "plusminus"
+        case .agents: return "person.2"
+        case .browser: return "globe"
+        case .file: return "doc.text"
+        }
     }
 }
