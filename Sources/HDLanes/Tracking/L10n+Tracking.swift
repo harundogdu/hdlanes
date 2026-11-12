@@ -150,6 +150,21 @@ extension L {
     static var tabWorkItems: String { pick("Work Items", "İşler") }
     static var sectionStateChanged: String { pick("State changed since yesterday", "Dünden beri durumu değişen") }
     static var sectionMyWorkItems: String { pick("Assigned to me", "Bana atanan") }
+    static func workItemBucket(_ b: WorkItem.Bucket) -> String {
+        switch b {
+        case .onMe: return pick("On me now", "Üzerimde")
+        case .queued: return pick("Up next", "Sırada")
+        case .handedOff: return pick("Handed off", "Benden çıktı")
+        }
+    }
+    static func workItemBucketHelp(_ b: WorkItem.Bucket) -> String {
+        switch b {
+        case .onMe: return pick("In progress or blocked", "Devam eden ya da bloklanan")
+        case .queued: return pick("Not started: new, to do, waiting", "Başlanmamış: yeni, yapılacak, bekleyen")
+        case .handedOff: return pick("With someone else: ready for test, preview or deployment, resolved",
+                                     "Başkasında: teste, önizlemeye ya da yayına hazır, çözüldü")
+        }
+    }
     static var sectionTeamWorkItems: String { pick("My teammates", "Ekibim") }
     static var loadingWorkItems: String { pick("Reading work items…", "İşler okunuyor…") }
     static var emptyStateChanged: String { pick("No state changes since yesterday.", "Dünden beri durum değişikliği yok.") }

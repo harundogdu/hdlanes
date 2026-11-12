@@ -62,4 +62,25 @@ struct WorkItemTests {
         let sorted = ["New", "Ready for Test", "In Progress", "Active"].sorted { WorkItem.stateRank($0) < WorkItem.stateRank($1) }
         #expect(sorted.prefix(2).sorted() == ["Active", "In Progress"] && sorted.last == "New")
     }
+
+    @Test func bucketsFollowTheStateName() {
+        func b(_ s: String) -> WorkItem.Bucket { WorkItem.bucket(s) }
+        #expect(b("In Progress") == .onMe)
+        #expect(b("Active") == .onMe)
+        #expect(b("Blocked") == .onMe)
+        #expect(b("New") == .queued)
+        #expect(b("To Do") == .queued)
+        #expect(b("Waiting Plan") == .queued)
+        #expect(b("Ready for Deployment") == .handedOff)
+        #expect(b("Ready for Preview") == .handedOff)
+        #expect(b("Ready for Test") == .handedOff)
+        #expect(b("Resolved") == .handedOff)
+        #expect(b("In Review") == .handedOff)
+    }
+
+    @Test func emptyOutputMeansNoItems() {
+        #expect(WorkItemQuery.parse(Data(), org: "o", project: "p") == [])
+        #expect(WorkItemQuery.parse(Data(" \n".utf8), org: "o", project: "p") == [])
+        #expect(WorkItemQuery.parse(Data("oops".utf8), org: "o", project: "p") == nil)
+    }
 }
