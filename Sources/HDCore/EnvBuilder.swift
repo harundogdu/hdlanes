@@ -132,6 +132,9 @@ public enum EnvBuilder {
         public var mcpConfigPath: String? = nil
         /// Raw shell command run before the agent (project setup in a fresh worktree).
         public var setupCommand: String?
+        /// Start as a copy of this conversation: Claude `--resume <id> --fork-session` (with
+        /// `agentSessionID` as the copy's `--session-id`), Codex `fork <id>`. Ignored when `resume`.
+        public var forkFrom: String? = nil
         /// Printed when the setup command fails; the agent starts anyway.
         public var setupFailedNotice: String
 
@@ -161,6 +164,9 @@ public enum EnvBuilder {
             if let dir = launch.pluginDir { parts.append("--plugin-dir \(ShellQuote.quote(dir))") }
             if let settings = launch.settingsPath { parts.append("--settings \(ShellQuote.quote(settings))") }
             if let mcp = launch.mcpConfigPath { parts.append("--mcp-config \(ShellQuote.quote(mcp))") }
+            if !launch.resume, let source = launch.forkFrom, !source.isEmpty {
+                parts.append("--resume \(ShellQuote.quote(source)) --fork-session")
+            }
             if let id = launch.agentSessionID, !id.isEmpty {
                 parts.append("\(launch.resume ? "--resume" : "--session-id") \(ShellQuote.quote(id))")
             }
@@ -170,6 +176,8 @@ public enum EnvBuilder {
             parts.append("codex")
             if launch.resume, let id = launch.agentSessionID, !id.isEmpty {
                 parts.append("resume \(ShellQuote.quote(id))")
+            } else if let source = launch.forkFrom, !source.isEmpty {
+                parts.append("fork \(ShellQuote.quote(source))")
             }
             if let prompt { parts.append(promptArgument(prompt)) }
         case .shell:

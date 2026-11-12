@@ -215,6 +215,31 @@ extension AppModel {
         return session.id
     }
 
+    /// A new session in the same project, folder, provider and account as `id`. With `fork`, it starts
+    /// as a copy of `id`'s conversation (Claude `--fork-session`, `codex fork`); otherwise empty. The
+    /// copy works in the same folder but never owns its worktree, so closing it can't remove that.
+    @discardableResult
+    func duplicateSession(_ id: UUID, fork: Bool) -> UUID? {
+        guard let source = session(id) else { return nil }
+        if fork { guard canFork(source) else { return nil } }
+        var copy = AgentSession(projectID: source.projectID, title: L.copyTitle(source.title, fork: fork),
+                                provider: source.provider, accountID: source.accountID, cwd: source.cwd)
+        copy.branch = source.branch
+        copy.baseRef = source.baseRef
+        copy.taskID = source.taskID
+        copy.category = source.category
+        copy.forkedFromAgentSessionID = fork ? source.agentSessionID : nil
+        state.sessions.append(copy)
+        selection = .session(copy.id)
+        launch(copy.id, resume: false)
+        return copy.id
+    }
+
+    /// A conversation to copy: an agent session that has talked at least once.
+    func canFork(_ session: AgentSession) -> Bool {
+        session.provider.isAgent && session.agentSessionID?.nilIfBlank != nil && session.lastActivityAt != nil
+    }
+
     func defaultSessionTitle(_ provider: Provider, in projectID: UUID) -> String {
         let n = state.sessions.filter { $0.projectID == projectID && $0.provider == provider }.count + 1
         return L.defaultSessionTitle(provider, n)

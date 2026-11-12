@@ -154,6 +154,18 @@ extension L {
     static var newSession: String { pick("New Session", "Yeni Oturum") }
     static var newSessionEllipsis: String { pick("New Session…", "Yeni Oturum…") }
     static var newSessionHelp: String { pick("New session (⌘N)", "Yeni oturum (⌘N)") }
+    static var forkConversation: String { pick("Fork Conversation", "Konuşmayı Çatalla") }
+    static var forkConversationHelp: String {
+        pick("A new session that starts with a copy of this conversation; the two go on separately.",
+             "Bu konuşmanın bir kopyasıyla başlayan yeni oturum; ikisi ayrı ayrı devam eder.")
+    }
+    static var newSessionSameSettings: String { pick("New Session with Same Settings", "Aynı Ayarlarla Yeni Oturum") }
+    static var newSessionSameSettingsHelp: String {
+        pick("An empty session in the same folder, branch and account.", "Aynı klasör, branch ve hesapta boş bir oturum.")
+    }
+    static func copyTitle(_ title: String, fork: Bool) -> String {
+        fork ? pick("\(title) (fork)", "\(title) (çatal)") : pick("\(title) (new)", "\(title) (yeni)")
+    }
     static func newSessionIn(_ project: String) -> String { pick("New session in \(project)", "\(project) içinde yeni oturum") }
     static var newTask: String { pick("New Task", "Yeni Görev") }
     static var newTaskEllipsis: String { pick("New Task…", "Yeni Görev…") }

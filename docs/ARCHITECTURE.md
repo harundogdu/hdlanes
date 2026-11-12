@@ -106,6 +106,13 @@ own file (an `apiKeyHelper` there made every managed account look logged in with
 
 Shell quoting: single-quote every interpolated value (`'` → `'\''`).
 
+**Fork / same settings** (session context menu, `AppModel.duplicateSession`). A new session in the same
+project, folder, branch, provider and account; it never owns the worktree (`worktreePath` nil), so
+closing it can't remove the original's. "Fork Conversation" (agent sessions that have talked) stores
+`forkedFromAgentSessionID` and its first launch runs `claude --resume <old> --fork-session --session-id
+<new>` (claude 2.1.322 accepts `--session-id` with `--resume` only together with `--fork-session`) or
+`codex fork <thread>`; later launches resume the fork's own id.
+
 ## Shared context (runtime area)
 
 A managed account is a separate config dir, so on its own it sees none of the default account's
