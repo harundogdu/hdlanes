@@ -23,6 +23,11 @@ extension L {
         pick("Linked: \(names.joined(separator: ", "))", "Bağlı: \(names.joined(separator: ", "))")
     }
 
+    static func sharedMerged(_ names: [String]) -> String {
+        pick("Own folder, shared items added inside: \(names.joined(separator: ", "))",
+             "Kendi klasörü, paylaşılanlar içine eklendi: \(names.joined(separator: ", "))")
+    }
+
     static func sharedOwn(_ names: [String]) -> String {
         pick("This account's own, left as is: \(names.joined(separator: ", "))",
              "Bu hesabın kendisinin, dokunulmadı: \(names.joined(separator: ", "))")

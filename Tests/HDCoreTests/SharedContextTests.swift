@@ -72,7 +72,7 @@ struct SharedContextTests {
         try FileManager.default.createSymbolicLink(atPath: t.sub("accounts/a/commands"), withDestinationPath: "/elsewhere")
 
         let result = states(SharedContext.sync(accountDir: account, sourceDir: source, provider: .claude))
-        #expect(result["skills"] == .occupied)
+        #expect(result["skills"] == .merged)
         #expect(result["CLAUDE.md"] == .occupied)
         #expect(result["commands"] == .occupied)
         #expect(try String(contentsOfFile: t.sub("accounts/a/CLAUDE.md"), encoding: .utf8) == "own")
@@ -110,11 +110,46 @@ struct SharedContextTests {
         try t.mkdir("accounts/c/agents")
 
         let result = states(SharedContext.sync(accountDir: account, sourceDir: source, provider: .codex))
-        #expect(result == ["AGENTS.md": .linked, "skills": .linked, "agents": .occupied, "prompts": .missingSource])
+        #expect(result == ["AGENTS.md": .linked, "skills": .linked, "agents": .merged, "prompts": .missingSource])
         #expect(Set(SharedContext.unlink(accountDir: account, sourceDir: source, provider: .codex)) == ["AGENTS.md", "skills"])
         #expect(FileManager.default.fileExists(atPath: t.sub("accounts/c/agents")))
         #expect(FileManager.default.fileExists(atPath: t.sub("home/.codex/skills")))
         #expect(!FileManager.default.fileExists(atPath: t.sub("accounts/c/skills")))
+    }
+
+    @Test func ownFolderGetsTheSharedItemsInsideIt() throws {
+        let t = try TempDir()
+        let source = try t.mkdir("home/.claude")
+        try t.mkdir("home/.claude/skills/alpha")
+        try t.mkdir("home/.claude/skills/beta")
+        try t.mkdir("home/.claude/skills/synced")
+        try t.write("home/.claude/skills/.DS_Store", "x")
+        let account = try t.mkdir("accounts/a")
+        try t.mkdir("accounts/a/skills/synced/own-skill")
+        try t.mkdir("accounts/a/skills/beta")
+        let fm = FileManager.default
+
+        #expect(states(SharedContext.status(accountDir: account, sourceDir: source, provider: .claude))["skills"] == .notLinked)
+        #expect(states(SharedContext.sync(accountDir: account, sourceDir: source, provider: .claude))["skills"] == .merged)
+        #expect(try fm.destinationOfSymbolicLink(atPath: t.sub("accounts/a/skills/alpha")) == t.sub("home/.claude/skills/alpha"))
+        // The account's own items stay: its synced folder and its own beta.
+        #expect((try? fm.destinationOfSymbolicLink(atPath: t.sub("accounts/a/skills/beta"))) == nil)
+        #expect(fm.fileExists(atPath: t.sub("accounts/a/skills/synced/own-skill")))
+        #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/a/skills/.DS_Store"))) == nil)
+        #expect(states(SharedContext.status(accountDir: account, sourceDir: source, provider: .claude))["skills"] == .merged)
+
+        // A shared item that goes away loses its link; a new one is linked.
+        try fm.removeItem(atPath: t.sub("home/.claude/skills/alpha"))
+        try t.mkdir("home/.claude/skills/gamma")
+        SharedContext.sync(accountDir: account, sourceDir: source, provider: .claude)
+        #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/a/skills/alpha"))) == nil)
+        #expect(fm.fileExists(atPath: t.sub("accounts/a/skills/gamma")))
+
+        // Turning sharing off removes only our item links.
+        #expect(SharedContext.unlink(accountDir: account, sourceDir: source, provider: .claude) == ["skills"])
+        #expect((try? fm.attributesOfItem(atPath: t.sub("accounts/a/skills/gamma"))) == nil)
+        #expect(fm.fileExists(atPath: t.sub("accounts/a/skills/beta")))
+        #expect(fm.fileExists(atPath: t.sub("accounts/a/skills/synced/own-skill")))
     }
 
     @Test func shellHasNothingToShare() {

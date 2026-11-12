@@ -202,6 +202,7 @@ private struct SharedContextControl: View {
         func names(_ state: SharedContext.LinkState) -> [String] { status.filter { $0.state == state }.map(\.name) }
         var out: [String] = []
         if !names(.linked).isEmpty { out.append(L.sharedLinked(names(.linked))) }
+        if !names(.merged).isEmpty { out.append(L.sharedMerged(names(.merged))) }
         if !names(.notLinked).isEmpty { out.append(L.sharedPending(names(.notLinked))) }
         if !names(.occupied).isEmpty { out.append(L.sharedOwn(names(.occupied))) }
         return out
