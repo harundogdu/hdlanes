@@ -462,12 +462,14 @@ session terminal needs nothing. Settings › Mods (`UI/ModsView.swift`, `UI/AppM
 - List: `claude plugin list --json` (`[{id, version, enabled, …}]`). Built-ins aren't listed; You Should Know's
   switch is `enabledPlugins["cc-plugin-you-should-know@builtin"]` in the account's settings.json.
 - Install: `claude plugin install <name> --marketplace <owner/repo | path> --json` → one line
-  `{"outcome":"ok"|"failed","message":…}`. A `shownCommand {command, sha256}` is shown to the user and only
-  then re-run with `--accept-command <sha256>`; never `-y`.
+  `{"outcome":"ok"|"failed","message":…}`. A marketplace that runs a command answers `outcome:"failed"` with a
+  `shownCommand {kind, pluginId, command, archiveUrl?, sha256}` (read from the 2.1.322 binary, not seen live):
+  the command is shown to the user and only then re-run with `--accept-command <sha256>`; never `-y`. No
+  showable command → plain failure.
 - Enable / disable / uninstall: `claude plugin <verb> <id> --json`, same result line.
 - Anthropic's samples (claude-code-playground has no root marketplace) are sparse-cloned into
   `mods/claude-code-playground/` and installed from `claude-code/mods` as a local marketplace, which loads
-  in place — the clone stays.
+  in place — the clone stays, and pulling it (on each sample install) updates installed samples too.
 - `ModCatalog.entries` carries the L0–L3 grade of the awesome-claude-code-mods catalogue (not an Anthropic
   concept). L2, L3, ungraded and hand-typed installs ask first. Running sessions pick changes up with
   `/reload-plugins`; hdlanes doesn't type it for the user.

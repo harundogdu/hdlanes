@@ -24,8 +24,8 @@ extension L {
     static var modsNoClaudeAccount: String { pick("Add a Claude account first; mods are a Claude Code feature.",
                                                   "Önce bir Claude hesabı ekle; modlar bir Claude Code özelliği.") }
     static var modsFooter: String {
-        pick("A mod runs inside Claude Code with your permissions; it isn't sandboxed. L0 draws, L1 reads, L2 writes files or runs commands, L3 reaches the network — levels as graded by the awesome-claude-code-mods catalogue, not by Anthropic. Anthropic's samples are cloned into ~/.hdlanes/mods and load from there.",
-             "Bir mod Claude Code içinde senin yetkilerinle çalışır; korumalı alanda değildir. L0 çizer, L1 okur, L2 dosya yazar ya da komut çalıştırır, L3 internete çıkar — seviyeler Anthropic'in değil, awesome-claude-code-mods kataloğunun derecelendirmesi. Anthropic'in örnekleri ~/.hdlanes/mods altına kopyalanır ve oradan yüklenir.")
+        pick("A mod runs inside Claude Code with your permissions; it isn't sandboxed. L0 draws, L1 reads, L2 writes files or runs commands, L3 reaches the network — levels as graded by the awesome-claude-code-mods catalogue, not by Anthropic. Anthropic's samples are cloned into ~/.hdlanes/mods and load from there; installing one updates that copy, and with it the samples already installed.",
+             "Bir mod Claude Code içinde senin yetkilerinle çalışır; korumalı alanda değildir. L0 çizer, L1 okur, L2 dosya yazar ya da komut çalıştırır, L3 internete çıkar — seviyeler Anthropic'in değil, awesome-claude-code-mods kataloğunun derecelendirmesi. Anthropic'in örnekleri ~/.hdlanes/mods altına kopyalanır ve oradan yüklenir; birini kurmak bu kopyayı, dolayısıyla kurulu örnekleri de günceller.")
     }
     static func modsConfirmTitle(_ name: String) -> String { pick("Install \(name)?", "\(name) kurulsun mu?") }
     static func modsConfirmBody(_ level: ModLevel?) -> String {
@@ -39,9 +39,10 @@ extension L {
                                  "Bu hesabın her oturumunda Claude Code içinde senin yetkilerinle çalışır. Yalnız güvendiğin modları kur.")
     }
     static var modsCommandTitle: String { pick("The marketplace runs a command", "Marketplace bir komut çalıştırıyor") }
-    static func modsCommandBody(_ command: String) -> String {
-        pick("Installing runs this command on your Mac:\n\n\(command)\n\nInstall only if you trust it.",
-             "Kurulum Mac'inde şu komutu çalıştırır:\n\n\(command)\n\nYalnız güveniyorsan kur.")
+    static func modsCommandBody(_ command: String, archiveURL: String?) -> String {
+        let from = archiveURL.map { pick("\n\nIt downloads: \($0)", "\n\nİndirdiği: \($0)") } ?? ""
+        return pick("Installing runs this command on your Mac:\n\n\(command)\(from)\n\nInstall only if you trust it.",
+                    "Kurulum Mac'inde şu komutu çalıştırır:\n\n\(command)\(from)\n\nYalnız güveniyorsan kur.")
     }
     static var modsGitMissing: String { pick("git isn't installed.", "git kurulu değil.") }
     static var modsCloneFailed: String { pick("Couldn't download Anthropic's sample mods.", "Anthropic'in örnek modları indirilemedi.") }

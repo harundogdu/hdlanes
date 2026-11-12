@@ -96,12 +96,25 @@ public enum ModCatalog {
     /// either part is empty or could pass for an option.
     public static func customInstallArguments(name: String, source: String) -> [String]? {
         let n = name.trimmingCharacters(in: .whitespaces), s = source.trimmingCharacters(in: .whitespaces)
+        // `@` would make it `name@marketplace` / `name@npm`, which the CLI reads differently.
         guard !n.isEmpty, !s.isEmpty, !n.hasPrefix("-"), !s.hasPrefix("-"),
-              !n.contains(where: \.isWhitespace) else { return nil }
+              !n.contains(where: { $0.isWhitespace || $0 == "@" }) else { return nil }
         return ["plugin", "install", n, "--marketplace", s, "--json"]
     }
 
     public static func arguments(_ verb: String, id: String) -> [String] { ["plugin", verb, id, "--json"] }
+
+    /// `arguments` accepting exactly the command with `sha256`, replacing an earlier acceptance.
+    public static func accepting(_ sha256: String, _ arguments: [String]) -> [String] {
+        var out: [String] = []
+        var skip = false
+        for a in arguments {
+            if skip { skip = false; continue }
+            if a == "--accept-command" { skip = true; continue }
+            out.append(a)
+        }
+        return out + ["--accept-command", sha256]
+    }
 }
 
 /// One line of `claude plugin list --json`.
@@ -137,17 +150,20 @@ public struct InstalledPlugin: Identifiable, Hashable, Sendable {
 /// The `--json` result line of `claude plugin install|uninstall|enable|disable`.
 public enum PluginCommandResult: Equatable, Sendable {
     case ok
-    /// The marketplace runs a command to install; it must be shown to the user, then accepted by sha256.
-    case needsCommand(command: String, sha256: String)
+    /// The marketplace runs a command to install (Claude Code 2.1.322: `outcome:"failed"` with
+    /// `shownCommand {kind, pluginId, command, archiveUrl?, sha256}`); shown to the user, then accepted by sha256.
+    case needsCommand(command: String, archiveURL: String?, sha256: String)
     case failed(String)
 
     public static func parse(_ stdout: String) -> PluginCommandResult? {
         for line in stdout.split(whereSeparator: \.isNewline).reversed() {
             guard let obj = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] else { continue }
-            if let shown = obj["shownCommand"] as? [String: Any], let sha = shown["sha256"] as? String,
-               (obj["outcome"] as? String) != "ok" {
-                let text = (shown["command"] as? String) ?? (shown["display"] as? String) ?? (shown["text"] as? String) ?? ""
-                return .needsCommand(command: text, sha256: sha)
+            if let shown = obj["shownCommand"] as? [String: Any], (obj["outcome"] as? String) != "ok" {
+                // Fail closed: nothing is offered for acceptance unless the command itself can be shown.
+                guard let sha = shown["sha256"] as? String, !sha.isEmpty,
+                      let text = shown["command"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else { return .failed((obj["message"] as? String) ?? "") }
+                return .needsCommand(command: text, archiveURL: shown["archiveUrl"] as? String, sha256: sha)
             }
             if (obj["outcome"] as? String) == "ok" { return .ok }
             return .failed((obj["message"] as? String) ?? "")

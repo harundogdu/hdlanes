@@ -19,12 +19,18 @@ struct ModsView: View {
     /// hand-typed one, or a marketplace that runs a command.
     struct PendingInstall: Identifiable {
         let id = UUID()
+        /// The account chosen when it was asked; the install goes there even if the picker moved.
+        let accountID: UUID
         let key: String
         let title: String
         let message: String
         let arguments: [String]
         let playground: Bool
+        let custom: Bool
     }
+
+    private static let customKey = "custom:"
+
 
     private var accounts: [Account] { model.accounts(for: .claude) }
     private var account: Account? { accounts.first { $0.id.uuidString == accountKey } ?? accounts.first }
@@ -36,6 +42,7 @@ struct ModsView: View {
                     Picker(L.modsAccount, selection: Binding(get: { account.id.uuidString }, set: { accountKey = $0 })) {
                         ForEach(accounts) { Text($0.label).tag($0.id.uuidString) }
                     }
+                    .disabled(busy != nil)
                     Text(L.modsIntro)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -62,7 +69,8 @@ struct ModsView: View {
                     HStack {
                         TextField(L.modsName, text: $customName, prompt: Text(verbatim: "cache-tax"))
                         TextField(L.modsMarketplace, text: $customSource, prompt: Text(verbatim: "owner/repo"))
-                        Button(L.modsInstall) { askCustom() }
+                        if busy?.hasPrefix(Self.customKey) == true { ProgressView().controlSize(.small) }
+                        Button(L.modsInstall) { askCustom(account) }
                             .disabled(busy != nil || ModCatalog.customInstallArguments(name: customName, source: customSource) == nil)
                     }
                     Text(L.modsFooter)
@@ -75,10 +83,19 @@ struct ModsView: View {
             }
         }
         .formStyle(.grouped)
-        .task(id: account?.id) { await reload() }
+        .task(id: account?.id) {
+            // Another account's rows must not stay clickable while this one loads.
+            installed = []
+            builtinOn = []
+            loaded = false
+            error = nil
+            if let account { await reload(account) }
+        }
         .alert(confirm?.title ?? "", isPresented: Binding(get: { confirm != nil }, set: { if !$0 { confirm = nil } }),
                presenting: confirm) { pending in
-            Button(L.modsInstall) { run(pending.key, pending.arguments, playground: pending.playground) }
+            Button(L.modsInstall) {
+                run(pending.key, pending.arguments, on: pending.accountID, playground: pending.playground, custom: pending.custom)
+            }
             Button(L.cancel, role: .cancel) {}
         } message: { pending in
             Text(pending.message)
@@ -97,14 +114,14 @@ struct ModsView: View {
             Spacer()
             if busy == plugin.id { ProgressView().controlSize(.small) }
             Toggle(L.modsEnabled, isOn: Binding(get: { plugin.enabled }, set: { on in
-                run(plugin.id, ModCatalog.arguments(on ? "enable" : "disable", id: plugin.id))
+                run(plugin.id, ModCatalog.arguments(on ? "enable" : "disable", id: plugin.id), on: account.id)
             }))
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.small)
             .disabled(busy != nil)
             .help(L.modsEnabledHelp)
-            Button { run(plugin.id, ModCatalog.arguments("uninstall", id: plugin.id)) } label: {
+            Button { run(plugin.id, ModCatalog.arguments("uninstall", id: plugin.id), on: account.id) } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
@@ -133,7 +150,7 @@ struct ModsView: View {
             if busy == entry.id { ProgressView().controlSize(.small) }
             if entry.source == .builtin {
                 Toggle(L.modsEnabled, isOn: Binding(get: { builtinOn.contains(entry.id) }, set: { on in
-                    run(entry.id, ModCatalog.arguments(on ? "enable" : "disable", id: entry.id))
+                    run(entry.id, ModCatalog.arguments(on ? "enable" : "disable", id: entry.id), on: account.id)
                 }))
                 .labelsHidden()
                 .toggleStyle(.switch)
@@ -145,7 +162,7 @@ struct ModsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else {
-                Button(L.modsInstall) { ask(entry) }
+                Button(L.modsInstall) { ask(entry, account: account) }
                     .controlSize(.small)
                     .disabled(busy != nil)
             }
@@ -154,59 +171,67 @@ struct ModsView: View {
 
     // MARK: Actions
 
-    private func ask(_ entry: ModEntry) {
+    private func ask(_ entry: ModEntry, account: Account) {
         let playground = entry.source == .playground
-        // The playground path is filled in after the clone; build with a placeholder to check the shape.
         guard let args = ModCatalog.installArguments(entry, playgroundPath: playground ? model.playgroundMarketplace : nil) else { return }
         if entry.level?.needsConfirmation ?? true {
-            confirm = PendingInstall(key: entry.id, title: L.modsConfirmTitle(L.modDisplayName(entry.name)),
-                                     message: L.modsConfirmBody(entry.level), arguments: args, playground: playground)
+            confirm = PendingInstall(accountID: account.id, key: entry.id, title: L.modsConfirmTitle(L.modDisplayName(entry.name)),
+                                     message: L.modsConfirmBody(entry.level), arguments: args, playground: playground, custom: false)
         } else {
-            run(entry.id, args, playground: playground)
+            run(entry.id, args, on: account.id, playground: playground)
         }
     }
 
-    private func askCustom() {
+    private func askCustom(_ account: Account) {
         guard let args = ModCatalog.customInstallArguments(name: customName, source: customSource) else { return }
         let name = customName.trimmingCharacters(in: .whitespaces)
-        confirm = PendingInstall(key: name, title: L.modsConfirmTitle(name), message: L.modsConfirmBody(nil),
-                                 arguments: args, playground: false)
+        confirm = PendingInstall(accountID: account.id, key: Self.customKey + name, title: L.modsConfirmTitle(name),
+                                 message: L.modsConfirmBody(nil), arguments: args, playground: false, custom: true)
     }
 
-    private func run(_ key: String, _ arguments: [String], playground: Bool = false) {
-        guard let account, busy == nil else { return }
+    private func run(_ key: String, _ arguments: [String], on accountID: UUID, playground: Bool = false, custom: Bool = false) {
+        guard let target = model.account(accountID), busy == nil else { return }
         busy = key
         error = nil
         Task {
-            defer { busy = nil }
-            if playground, let failure = await model.preparePlayground() {
-                error = failure
-                return
+            var failure: String?
+            var next: PendingInstall?
+            if playground, let e = await model.preparePlayground() {
+                failure = e
+            } else {
+                switch await model.runPluginCommand(target, arguments) {
+                case .ok:
+                    if custom { customName = ""; customSource = "" }
+                case .needsCommand(let command, let archiveURL, let sha):
+                    // Shown as-is; only this exact command is accepted.
+                    next = PendingInstall(accountID: accountID, key: key, title: L.modsCommandTitle,
+                                          message: L.modsCommandBody(command, archiveURL: archiveURL),
+                                          arguments: ModCatalog.accepting(sha, arguments), playground: false, custom: custom)
+                case .failed(let message):
+                    failure = message.isEmpty ? L.modsCommandFailed : message
+                }
             }
-            switch await model.runPluginCommand(account, arguments) {
-            case .ok:
-                if arguments.contains("install") { customName = ""; customSource = "" }
-            case .needsCommand(let command, let sha):
-                // Shown as-is; only this exact command is accepted.
-                confirm = PendingInstall(key: key, title: L.modsCommandTitle, message: L.modsCommandBody(command),
-                                         arguments: arguments + ["--accept-command", sha], playground: false)
-            case .failed(let message):
-                error = message.isEmpty ? L.modsCommandFailed : message
-            }
-            await reload()
+            // Free the buttons before asking again, or the confirmed retry would hit `busy`.
+            busy = nil
+            guard account?.id == accountID else { return }
+            error = failure
+            if let next { confirm = next }
+            await reload(target)
         }
     }
 
-    private func reload() async {
-        guard let account else { return }
-        switch await model.installedPlugins(account) {
+    private func reload(_ target: Account) async {
+        let result = await model.installedPlugins(target)
+        // A late answer for an account no longer shown is dropped.
+        guard !Task.isCancelled, account?.id == target.id else { return }
+        switch result {
         case .success(let list):
             installed = list.filter { !$0.id.hasSuffix("@builtin") && !$0.id.hasSuffix("@skills-dir") }
         case .failure(let e):
             installed = []
             error = e.message
         }
-        builtinOn = Set(ModCatalog.entries.filter { $0.source == .builtin && model.isBuiltinEnabled($0.id, account: account) }.map(\.id))
+        builtinOn = Set(ModCatalog.entries.filter { $0.source == .builtin && model.isBuiltinEnabled($0.id, account: target) }.map(\.id))
         loaded = true
     }
 }
