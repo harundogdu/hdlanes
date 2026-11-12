@@ -54,6 +54,25 @@ public struct WorkItem: Identifiable, Hashable, Sendable {
         return 1
     }
 
+    /// Where an item stands for its assignee, from its state name (any process template).
+    public enum Bucket: Int, CaseIterable, Sendable {
+        /// In progress or blocked: on the assignee's desk now.
+        case onMe
+        /// Not started yet: new, to do, approved, waiting.
+        case queued
+        /// Done on the assignee's side, with someone else: ready for test / preview / deployment, resolved.
+        case handedOff
+    }
+
+    public static func bucket(_ state: String) -> Bucket {
+        let s = state.lowercased()
+        if ["resolved", "test", "review", "deploy", "preview", "verif", "qa", "uat", "release"].contains(where: s.contains) {
+            return .handedOff
+        }
+        if stateRank(state) == 0 || s.contains("blocked") { return .onMe }
+        return .queued
+    }
+
     /// True when `person` (a unique name / email or a display name, as typed in Settings) is the assignee.
     public func isAssigned(to person: String) -> Bool {
         let p = person.trimmingCharacters(in: .whitespaces)
@@ -123,6 +142,8 @@ public enum WorkItemQuery {
 
     /// `az boards query -o json`: an array of `{id, fields: {"System.Title": …, "System.AssignedTo": {displayName, uniqueName}}}`.
     public static func parse(_ data: Data, org: String, project: String) -> [WorkItem]? {
+        // No match: `az boards query` exits 0 and prints nothing at all, not `[]` (azure-devops extension).
+        if String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return [] }
         guard let items = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return nil }
         return items.compactMap { item in
             guard let number = item["id"] as? Int, let f = item["fields"] as? [String: Any] else { return nil }

@@ -40,7 +40,7 @@ struct WorkItemsTab: View {
                     }
                     TrackingSection(title: L.sectionMyWorkItems, count: recentMine.count,
                                     empty: emptyText(L.emptyMyWorkItems), isEmpty: t.myWorkItems.isEmpty) {
-                        Grouped(items: recentMine, key: \.state, byState: true, showAssignee: false)
+                        BucketGroups(items: recentMine)
                         if !oldMine.isEmpty {
                             Button { showOldMine.toggle() } label: {
                                 HStack(spacing: 4) {
@@ -87,6 +87,57 @@ struct WorkItemsTab: View {
 
     private func emptyText(_ loaded: String) -> String {
         model.tracking.workItemsLoadedAt == nil ? L.loadingWorkItems : loaded
+    }
+}
+
+/// My items in three buckets (on me, queued, handed off), each by state; handed off starts folded.
+private struct BucketGroups: View {
+    let items: [WorkItem]
+    @State private var folded: Set<WorkItem.Bucket> = [.handedOff]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(WorkItem.Bucket.allCases, id: \.self) { bucket in
+                let group = items.filter { WorkItem.bucket($0.state) == bucket }
+                if !group.isEmpty {
+                    let open = !folded.contains(bucket)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            if open { folded.insert(bucket) } else { folded.remove(bucket) }
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: open ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 10)
+                                Circle().fill(color(bucket)).frame(width: 7, height: 7)
+                                Text(L.workItemBucket(bucket)).font(.system(size: 12, weight: .semibold))
+                                Text(verbatim: "\(group.count)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 6)
+                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(L.workItemBucketHelp(bucket))
+                        if open {
+                            Grouped(items: group, key: \.state, byState: true, showAssignee: false)
+                                .padding(.leading, 10)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func color(_ bucket: WorkItem.Bucket) -> Color {
+        switch bucket {
+        case .onMe: return .accentColor
+        case .queued: return .secondary
+        case .handedOff: return .green
+        }
     }
 }
 
