@@ -112,6 +112,9 @@ public struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     public var lastResultAt: Date?
     /// Web URL of the pull request a review session was started for (its worktree is detached).
     public var reviewPullRequestURL: String?
+    /// Conversation this session was forked from (Claude session id / Codex thread id); used on the
+    /// first launch only (`claude --resume … --fork-session`, `codex fork …`).
+    public var forkedFromAgentSessionID: String?
 
     public init(id: UUID = UUID(), projectID: UUID, title: String, provider: Provider, accountID: UUID?,
                 cwd: String, createdAt: Date = Date()) {

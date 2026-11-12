@@ -250,6 +250,12 @@ private struct SessionContextMenu: View {
             Button(L.stop) { model.stop(session.id) }
         }
         Divider()
+        if session.provider == .claude {
+            Button(L.forkConversation) { model.duplicateSession(session.id, fork: true) }
+                .disabled(!model.canFork(session))
+        }
+        Button(L.newSessionSameSettings) { model.duplicateSession(session.id, fork: false) }
+        Divider()
         Button(L.closeEllipsis) { actions.close(session.id, false) }
         if session.worktreePath != nil {
             Button(L.closeAndRemoveWorktreeEllipsis) { actions.close(session.id, true) }

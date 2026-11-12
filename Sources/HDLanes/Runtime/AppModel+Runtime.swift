@@ -210,6 +210,7 @@ extension AppModel {
             resume: resumeAgent, initialPrompt: firstLaunch ? session.initialPrompt : nil, pluginDir: pluginDir,
             settingsPath: settingsPath, setupCommand: setup, setupFailedNotice: L.setupCommandFailed)
         agentLaunch.mcpConfigPath = mcpConfig
+        if firstLaunch { agentLaunch.forkFrom = session.forkedFromAgentSessionID }
 
         resetLiveState(sessionID, agentSessionID: agentSessionID)
         if shellAlive {

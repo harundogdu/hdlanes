@@ -425,4 +425,18 @@ struct EnvBuilderTests {
         p.waitUntilExit()
         return String(decoding: data, as: UTF8.self)
     }
+
+    @Test func forkStartsFromACopyOfTheConversation() {
+        var claude = EnvBuilder.AgentLaunch(provider: .claude, account: nil, title: "", agentSessionID: "new-id", resume: false)
+        claude.forkFrom = "old-id"
+        #expect(EnvBuilder.agentInvocation(claude).hasSuffix("claude --resume 'old-id' --fork-session --session-id 'new-id'"))
+        // A later resume of the fork resumes the fork itself.
+        claude.resume = true
+        #expect(!EnvBuilder.agentInvocation(claude).contains("--fork-session"))
+
+        // Codex forks aren't offered yet (the rollout watcher hasn't been checked against a fork).
+        var codex = EnvBuilder.AgentLaunch(provider: .codex, account: nil, title: "", agentSessionID: nil, resume: false)
+        codex.forkFrom = "thread-1"
+        #expect(!EnvBuilder.agentInvocation(codex).contains("fork"))
+    }
 }

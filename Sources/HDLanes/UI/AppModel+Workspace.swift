@@ -32,6 +32,8 @@ enum WorkspaceError: LocalizedError, Equatable {
     case noAccount(Provider)
     case systemAccount
     case accountInUse(Int)
+    /// Other open sessions work in the worktree that would be removed.
+    case worktreeInUse(Int)
     case notManaged
     case emptySecret
     case cliMissing(Provider)
@@ -50,6 +52,7 @@ enum WorkspaceError: LocalizedError, Equatable {
         case .noAccount(let p): return L.errNoAccount(p)
         case .systemAccount: return L.errSystemAccount
         case .accountInUse(let n): return L.errAccountInUse(n)
+        case .worktreeInUse(let n): return L.errWorktreeInUse(n)
         case .notManaged: return L.errNotManaged
         case .emptySecret: return L.errEmptySecret
         case .cliMissing(let p): return L.cliMissing(p)
@@ -215,6 +218,32 @@ extension AppModel {
         return session.id
     }
 
+    /// A new session in the same project, folder, provider and account as `id`. With `fork`, it starts
+    /// as a copy of `id`'s conversation (Claude `--fork-session`, `codex fork`); otherwise empty. The
+    /// copy works in the same folder but never owns its worktree, so closing it can't remove that.
+    @discardableResult
+    func duplicateSession(_ id: UUID, fork: Bool) -> UUID? {
+        guard let source = session(id) else { return nil }
+        if fork { guard canFork(source) else { return nil } }
+        var copy = AgentSession(projectID: source.projectID, title: L.copyTitle(source.title, fork: fork),
+                                provider: source.provider, accountID: source.accountID, cwd: source.cwd)
+        copy.branch = source.branch
+        copy.baseRef = source.baseRef
+        copy.taskID = source.taskID
+        copy.category = source.category
+        copy.forkedFromAgentSessionID = fork ? source.agentSessionID : nil
+        state.sessions.append(copy)
+        selection = .session(copy.id)
+        launch(copy.id, resume: false)
+        return copy.id
+    }
+
+    /// A conversation to copy: a Claude session that finished at least one turn. Codex (`codex fork`)
+    /// waits until its forked rollout has been checked against the rollout watcher.
+    func canFork(_ session: AgentSession) -> Bool {
+        session.provider == .claude && session.agentSessionID?.nilIfBlank != nil && session.lastResultAt != nil
+    }
+
     func defaultSessionTitle(_ provider: Provider, in projectID: UUID) -> String {
         let n = state.sessions.filter { $0.projectID == projectID && $0.provider == provider }.count + 1
         return L.defaultSessionTitle(provider, n)
@@ -225,6 +254,12 @@ extension AppModel {
     func closeSessionThrowing(_ id: UUID, removeWorktree: Bool) async throws {
         guard let session = session(id) else { return }
         if removeWorktree, let path = session.worktreePath {
+            // A copy (same settings / fork) may work in this folder; removing it would pull the floor out.
+            let root = HDPaths.normalizedDirString(path)
+            let others = visibleSessions.filter {
+                $0.id != id && (HDPaths.normalizedDirString($0.cwd) == root || $0.cwd.hasPrefix(root + "/"))
+            }
+            if !others.isEmpty { throw WorkspaceError.worktreeInUse(others.count) }
             if let risks = try await worktreeRemovalRisks(sessionID: id), risks.needsConfirmation {
                 throw GitError.worktreeDirty(path: path, risks: risks)
             }
