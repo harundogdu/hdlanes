@@ -9,7 +9,7 @@ struct InboxSidebarRow: View {
     var body: some View {
         let count = model.inbox.visibleItems.count
         HStack {
-            Label(L.inbox, systemImage: "tray")
+            Label { Text(L.inbox) } icon: { NavIcon(symbol: "tray", tint: 1) }
             Spacer()
             if model.inbox.isRefreshing {
                 ProgressView().controlSize(.mini)

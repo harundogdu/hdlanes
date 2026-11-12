@@ -11,7 +11,7 @@ struct SettingsView: View {
                 .tabItem { Label(L.general, systemImage: "gearshape") }
                 .tag("general")
             TerminalSettingsView()
-                .tabItem { Label(L.terminal, systemImage: "terminal") }
+                .tabItem { Label(L.appearanceTab, systemImage: "paintpalette") }
                 .tag("terminal")
             AccountsView()
                 .tabItem { Label(L.accounts, systemImage: "person.2") }

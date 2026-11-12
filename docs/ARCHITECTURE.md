@@ -535,7 +535,17 @@ absolute and `~/` paths open, and a `:line` suffix is dropped.
   cards, no marketing copy, no "✨". Density like Xcode / Mail / Linear's macOS app.
 - Text sizes: body 13, secondary 11, monospaced code 12. Secondary info in `.secondary`.
 - One color per meaning: status colors (`Theme.color(for:)`), account dot color (`Theme.accountColor`),
-  category color (`Theme.categoryColor`). Never more than these.
+  category color (`Theme.categoryColor`), plus the app theme's own (below). Never more than these.
+- App themes (`HDCore/AppTheme.swift`, Settings › Appearance, `settings.appTheme`): Midnight Blue, Graphite,
+  Warm Charcoal, all dark; nil = Classic, the system look with materials. A theme colors the window, sidebar
+  column (painted edge to edge over the split view's material), title bar, session header, inspector and
+  usage footer, sets text color and `.tint`, hides list/scroll backgrounds in the detail area
+  (`scrollContentBackground(.hidden)`), forces dark Aqua for AppKit controls and alerts, and gives the
+  sidebar's Tracking / Inbox / Board icons colored tiles and the header status a pill. Graphite also puts
+  a soft shadow under the terminal card (on a shape behind it, not on the terminal view). Switching
+  themes moves the terminal to the new theme's palette (Tokyo Night, Graphite, Warm Charcoal; Classic →
+  hdlanes) only while it shows the default or the outgoing theme's palette: a terminal theme the user
+  picked stays. Segmented pickers and split-view dividers stay system-drawn.
 - Every list has an empty state with one sentence + one action; side panels use `CompactEmptyState`
   (13 pt title), not `ContentUnavailableView`'s large title. Every async action has a progress state
   and an error state (`model.show(error:title:)` or inline). No dead buttons: disable with a tooltip

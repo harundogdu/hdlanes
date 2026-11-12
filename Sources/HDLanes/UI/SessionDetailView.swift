@@ -12,12 +12,14 @@ struct SessionDetailView: View {
         if let session = model.session(sessionID) {
             VStack(spacing: 0) {
                 SessionHeader(session: session)
+                    .themeBackground(model.appTheme, \.sidebar)
                 Divider()
                 HSplitView {
                     SessionTerminalArea(session: session)
                         .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
                     if model.isInspectorVisible {
                         InspectorView(sessionID: sessionID)
+                            .themeBackground(model.appTheme, \.panel)
                             .frame(minWidth: 340, idealWidth: 400, maxWidth: 720, maxHeight: .infinity)
                     }
                 }
@@ -55,11 +57,7 @@ private struct SessionHeader: View {
                     .help(session.worktreePath ?? session.cwd)
             }
             Spacer(minLength: 8)
-            StatusGlyph(status: status)
-            Text(L.statusText(status))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            StatusPill(status: status)
             RunControl(session: session)
         }
         .padding(.horizontal, 12)
@@ -170,12 +168,26 @@ private struct SessionTerminalArea: View {
         .background(Color(nsColor: TerminalTheme.color(palette.background)))
         .clipShape(shape)
         .overlay {
-            shape.strokeBorder(account.map { Theme.accountColor($0.colorIndex).opacity(0.55) }
-                               ?? (palette.isDark ? Color.white : Color.black).opacity(0.12), lineWidth: 1)
+            shape.strokeBorder(edge(account: account, palette: palette), lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .padding(8)
-        .background(Color(nsColor: .windowBackgroundColor))
+        // A shadow on a shape behind the card, never on the hosted terminal view itself.
+        .background {
+            if model.appTheme?.cardShadow == true {
+                shape.fill(Color.black).shadow(color: .black.opacity(0.4), radius: 12, y: 5)
+            }
+        }
+        .padding(model.appTheme == nil ? 8 : 10)
+        .background(model.appTheme.map { Theme.color($0.window) } ?? Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+extension SessionTerminalArea {
+    /// The card's edge: the theme's own, else the account's color, else a faint neutral line.
+    func edge(account: Account?, palette: TerminalPalette) -> Color {
+        if let theme = model.appTheme, let edge = theme.cardEdge { return Theme.color(edge) }
+        if let account { return Theme.accountColor(account.colorIndex).opacity(model.appTheme == nil ? 0.55 : 0.8) }
+        return (palette.isDark ? Color.white : Color.black).opacity(0.12)
     }
 }
 

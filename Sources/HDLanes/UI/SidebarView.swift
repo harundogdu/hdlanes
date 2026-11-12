@@ -38,6 +38,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .modifier(ThemedList(theme: model.appTheme, color: \.sidebar))
         .overlay { SidebarEmptyState(sections: sections) }
         .safeAreaInset(edge: .top, spacing: 0) { SidebarFilterBar() }
         .safeAreaInset(edge: .bottom, spacing: 0) { UsageFooter() }
@@ -103,7 +104,7 @@ private struct BoardRow: View {
 
     var body: some View {
         HStack {
-            Label(L.board, systemImage: "rectangle.split.3x1")
+            Label { Text(L.board) } icon: { NavIcon(symbol: "rectangle.split.3x1", tint: 2) }
             Spacer()
             if model.activeTaskCount > 0 {
                 Text(verbatim: "\(model.activeTaskCount)")
@@ -285,6 +286,22 @@ private struct SidebarEmptyState: View {
                     .controlSize(.small)
             }
             .padding(20)
+        }
+    }
+}
+
+/// A list drawn on the theme's color instead of the system material (Classic keeps the material).
+struct ThemedList: ViewModifier {
+    let theme: AppTheme?
+    let color: KeyPath<AppTheme, RGB>
+
+    func body(content: Content) -> some View {
+        if let theme {
+            content
+                .scrollContentBackground(.hidden)
+                .background(Theme.color(theme[keyPath: color]))
+        } else {
+            content
         }
     }
 }

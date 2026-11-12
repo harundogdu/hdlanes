@@ -86,6 +86,24 @@ enum DevSnapshot {
                 settingsWindow.orderFront(nil)
             }))
         }
+        // Each app theme on a session (Agents tab, as left by `session-agents`) and on Tracking.
+        if let first = model.visibleSessions.first {
+            for theme in AppTheme.builtIn {
+                steps.append(("theme-\(theme.id)", {
+                    model.setAppTheme(theme.id)
+                    model.selection = .session(first.id)
+                }))
+                steps.append(("theme-\(theme.id)-tracking", { model.selection = .tracking }))
+            }
+        }
+        // Back to Classic, so the steps after these and the test home's settings stay as they were.
+        steps.append(("settings-appearance", {
+            model.setAppTheme(nil)
+            defaults.set("terminal", forKey: "hd.settingsTab")
+            settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(model))
+            settingsWindow.center()
+            settingsWindow.orderFront(nil)
+        }))
         run(steps, index: 0, dir: dir) {
             // The test instance shares the real app's defaults; put the user's tab back.
             if let previousTab { defaults.set(previousTab, forKey: "hd.settingsTab") } else { defaults.removeObject(forKey: "hd.settingsTab") }
