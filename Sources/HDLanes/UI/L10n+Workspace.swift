@@ -460,6 +460,17 @@ extension L {
         return pick("Sign in on the page that opens in your browser. It uses whichever \(site) account is signed in there; for a different one, open the link in a private window or another browser profile. Press Done when the terminal says you're logged in.",
                     "Tarayıcıda açılan sayfada giriş yap. Orada açık olan \(site) hesabı kullanılır; başka bir hesap için bağlantıyı gizli pencerede ya da başka bir tarayıcı profilinde aç. Terminal girişin tamamlandığını söyleyince Bitti'ye bas.")
     }
+    static var deviceCodeTitle: String { pick("Device code (codex login --device-auth)", "Cihaz kodu (codex login --device-auth)") }
+    static var deviceCodeDetail: String {
+        pick("Shows a link and a one-time code in the terminal; enter the code in a browser on any device, signed in to the ChatGPT account you want. Nothing opens on this Mac.",
+             "Terminalde bir bağlantı ve tek kullanımlık kod gösterir; kodu herhangi bir cihazdaki tarayıcıda, istediğin ChatGPT hesabıyla giriş yapıp gir. Bu Mac'te hiçbir şey açılmaz.")
+    }
+    static var deviceCodeInstructions: String {
+        pick("Open the link shown below in any browser, sign in to the ChatGPT account for this account and enter the code. If device code sign-in is off for your workspace, turn it on in ChatGPT's security settings. Press Done when the terminal says you're logged in.",
+             "Aşağıda görünen bağlantıyı herhangi bir tarayıcıda aç, bu hesabın ChatGPT hesabıyla giriş yap ve kodu gir. Çalışma alanında cihaz koduyla giriş kapalıysa ChatGPT'nin güvenlik ayarlarından aç. Terminal girişin tamamlandığını söyleyince Bitti'ye bas.")
+    }
+    static var useDeviceCode: String { pick("Use a Device Code", "Cihaz Kodu Kullan") }
+    static var useBrowserLogin: String { pick("Use the Browser", "Tarayıcıyı Kullan") }
     static var pasteTokenPlaceholder: String { pick("Paste the token shown above", "Yukarıda görünen token'ı yapıştır") }
     static var saved: String { pick("Saved", "Kaydedildi") }
     static var runAgain: String { pick("Run Again", "Yeniden Çalıştır") }
